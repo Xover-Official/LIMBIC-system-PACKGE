@@ -6,6 +6,19 @@ service LimbicService {
   rpc InjectStimulus (StimulusRequest) returns (LimbicResponse);
   rpc GetLimbicState (Empty) returns (LimbicState);
   rpc StreamState (Empty) returns (stream LimbicState);
+  rpc GetPlans (Empty) returns (PlanList);
+}
+
+message PlanList {
+  repeated Plan plans = 1;
+}
+
+message Plan {
+  string action = 1;
+  float confidence = 2;
+  float utility = 3;
+  bool approved = 4;
+  string status = 5;
 }
 
 message Empty {}

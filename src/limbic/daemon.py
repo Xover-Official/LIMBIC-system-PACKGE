@@ -7,7 +7,7 @@ from limbic.bus import LimbicBus
 from limbic.generated import limbic_pb2_grpc, limbic_pb2
 from limbic.core.hypothalamus import Hypothalamus
 from limbic.core.amygdala import Amygdala
-from limbic.core.hippocampus import Hippocampus
+from limbic.core.hippocampus import HippocampusV2
 from limbic.core.nucleus_accumbens import NucleusAccumbens
 from limbic.core.insula import Insula
 from limbic.persistence.sqlite_manager import SQLiteManager, EventLogger
@@ -16,6 +16,13 @@ from limbic.engines.seeking import SeekingEngine
 from limbic.engines.fear import FearEngine
 from limbic.engines.panic import PanicEngine
 from limbic.engines.care import CareEngine
+
+# PFC Imports
+from limbic.pfc.dlpfc import DLPFC
+from limbic.pfc.vmpfc import VMPFC
+from limbic.pfc.ofc import OFC
+from limbic.pfc.acc import ACC
+from limbic.pfc.executive_control import ExecutiveControl
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,6 +49,20 @@ class LimbicServicer(limbic_pb2_grpc.LimbicServiceServicer):
                 last_timestamp = state.timestamp
             await asyncio.sleep(1)
 
+    async def GetPlans(self, request, context):
+        plans = []
+        # Get current plans from DLPFC/Executive
+        # For simplicity, we'll store them in the daemon or query components
+        for action, data in self.daemon.active_plans.items():
+            plans.append(limbic_pb2.Plan(
+                action=action,
+                confidence=data.get("confidence", 0.0),
+                utility=data.get("utility", 0.0),
+                approved=data.get("approved", False),
+                status=data.get("status", "PENDING")
+            ))
+        return limbic_pb2.PlanList(plans=plans)
+
 class LimbicDaemon:
     def __init__(self, port=50051):
         self.port = port
@@ -52,9 +73,16 @@ class LimbicDaemon:
         self.hypothalamus = Hypothalamus(self.bus)
         self.amygdala = Amygdala(self.bus)
         self.vs = VectorStore()
-        self.hippocampus = Hippocampus(self.bus, self.vs)
+        self.hippocampus = HippocampusV2(self.bus, self.vs)
         self.na = NucleusAccumbens(self.bus)
         self.insula = Insula(self.bus)
+        
+        # PFC
+        self.dlpfc = DLPFC(self.bus)
+        self.vmpfc = VMPFC(self.bus)
+        self.ofc = OFC(self.bus)
+        self.acc = ACC(self.bus)
+        self.executive = ExecutiveControl(self.bus)
         
         # Persistence
         self.sql_manager = SQLiteManager()
@@ -73,11 +101,18 @@ class LimbicDaemon:
         self.valence = 0.0
         self.current_drives = {}
         self.active_engines = {}
+        self.active_plans = {}
         
         # Subscribe to updates for global state
         self.bus.subscribe("DRIVE_UPDATE", self.update_drives)
         self.bus.subscribe("ENGINE_ACTIVE", self.update_engines)
         self.bus.subscribe("SIGNIFICANCE_EVALUATED", self.update_valence_arousal)
+        
+        # Subscribe to PFC events
+        self.bus.subscribe("PLAN_GENERATED", self.on_plan_generated)
+        self.bus.subscribe("PLAN_VETTED", self.on_plan_vetted)
+        self.bus.subscribe("UTILITY_ASSIGNED", self.on_utility_assigned)
+        self.bus.subscribe("ACTION_COMMAND", self.on_action_command)
 
     def update_drives(self, drives):
         self.current_drives = drives
@@ -86,9 +121,32 @@ class LimbicDaemon:
         self.active_engines[engine_info["name"]] = engine_info["level"]
 
     def update_valence_arousal(self, eval):
-        # Rolling average or similar for global state
         self.valence = (self.valence * 0.7) + (eval["valence"] * 0.3)
         self.arousal = (self.arousal * 0.7) + (eval["arousal"] * 0.3)
+
+    def on_plan_generated(self, plan):
+        action = plan["action"]
+        self.active_plans[action] = {
+            "confidence": plan.get("confidence", 0.0),
+            "status": "GENERATED"
+        }
+
+    def on_plan_vetted(self, vetting):
+        action = vetting["plan"]["action"]
+        if action in self.active_plans:
+            self.active_plans[action]["approved"] = vetting["approved"]
+            self.active_plans[action]["status"] = "VETTED" if vetting["approved"] else "BLOCKED"
+
+    def on_utility_assigned(self, data):
+        action = data["plan"]["action"]
+        if action in self.active_plans:
+            self.active_plans[action]["utility"] = data["utility"]
+            self.active_plans[action]["status"] = "VALUED"
+
+    def on_action_command(self, command):
+        action = command["action"]
+        if action in self.active_plans:
+            self.active_plans[action]["status"] = "EXECUTING"
 
     def get_current_state(self):
         dominant = "CALM"
@@ -119,6 +177,12 @@ class LimbicDaemon:
         tasks = [
             asyncio.create_task(self.bus.run()),
             asyncio.create_task(self.hypothalamus.run()),
+            asyncio.create_task(self.hippocampus.run()),
+            asyncio.create_task(self.dlpfc.run()),
+            asyncio.create_task(self.vmpfc.run()),
+            asyncio.create_task(self.ofc.run()),
+            asyncio.create_task(self.acc.run()),
+            asyncio.create_task(self.executive.run()),
             asyncio.create_task(self.engines["SEEKING"].run()),
             asyncio.create_task(self.engines["FEAR"].run()),
             asyncio.create_task(self.engines["PANIC"].run()),
@@ -130,3 +194,10 @@ class LimbicDaemon:
         except asyncio.CancelledError:
             for t in tasks: t.cancel()
             await server.stop(0)
+
+if __name__ == "__main__":
+    daemon = LimbicDaemon()
+    try:
+        asyncio.run(daemon.run())
+    except KeyboardInterrupt:
+        pass
