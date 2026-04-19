@@ -1,6 +1,7 @@
 import asyncio
 from typing import Callable, Dict, List, Any
 import logging
+from limbic.core.exceptions import CognitiveException
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +27,22 @@ class LimbicBus:
                 for callback in self.subscribers[topic]:
                     try:
                         if asyncio.iscoroutinefunction(callback):
-                            asyncio.create_task(callback(data))
+                            async def wrapped_callback(cb, d, t):
+                                try:
+                                    await cb(d)
+                                except CognitiveException as ce:
+                                    logger.warning(f"CognitiveException in async callback for topic {t}: {ce}")
+                                    await self.publish("SYSTEM_REGRESSION", {"exception": str(ce), "component": ce.component, "severity": ce.severity})
+                                except Exception as e:
+                                    logger.error(f"Error in async callback for topic {t}: {e}")
+                            
+                            asyncio.create_task(wrapped_callback(callback, data, topic))
                         else:
-                            callback(data)
+                            try:
+                                callback(data)
+                            except CognitiveException as ce:
+                                logger.warning(f"CognitiveException in callback for topic {topic}: {ce}")
+                                await self.publish("SYSTEM_REGRESSION", {"exception": str(ce), "component": ce.component, "severity": ce.severity})
                     except Exception as e:
-                        logger.error(f"Error in callback for topic {topic}: {e}")
+                        logger.error(f"Error in callback invocation for topic {topic}: {e}")
             self.queue.task_done()

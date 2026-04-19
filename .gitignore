@@ -41,5 +41,9 @@ src/limbic/generated/limbic_pb2_grpc.py
 .vscode/
 .idea/
 
+# Next.js
+dashboard/node_modules/
+dashboard/.next/
+
 # OS files
 .DS_Store
