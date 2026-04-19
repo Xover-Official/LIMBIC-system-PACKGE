@@ -23,13 +23,15 @@ class GlobalWorkspace:
             "STIMULUS": 0.5,
             "EMOTION_EVOKED": 0.7,
             "CONFLICT_DETECTED": 0.9,
-            "UTILITY_ASSIGNED": 0.4
+            "UTILITY_ASSIGNED": 0.4,
+            "SOCIAL_SIGNAL": 0.6
         }
         
         self.bus.subscribe("STIMULUS", lambda data: self.on_signal("STIMULUS", data))
         self.bus.subscribe("EMOTION_EVOKED", lambda data: self.on_signal("EMOTION_EVOKED", data))
         self.bus.subscribe("CONFLICT_DETECTED", lambda data: self.on_signal("CONFLICT_DETECTED", data))
         self.bus.subscribe("UTILITY_ASSIGNED", lambda data: self.on_signal("UTILITY_ASSIGNED", data))
+        self.bus.subscribe("SOCIAL_SIGNAL", lambda data: self.on_signal("SOCIAL_SIGNAL", data))
 
     def on_signal(self, topic: str, data: Any):
         # Calculate salience

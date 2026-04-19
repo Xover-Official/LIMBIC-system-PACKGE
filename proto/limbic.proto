@@ -68,6 +68,13 @@ message LimbicState {
   float age = 13;
   float plasticity = 14;
   float vagal_tone = 15;
+  SocialState social = 16;
+}
+
+message SocialState {
+  float reputation = 1;
+  float global_trust = 2;
+  map<string, float> self_concept = 3;
 }
 
 message ConsciousState {
