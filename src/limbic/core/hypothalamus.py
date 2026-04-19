@@ -10,7 +10,8 @@ class Hypothalamus:
             "thirst": 0.0,
             "sleep": 0.0,
             "safety": 1.0,
-            "belonging": 0.5
+            "belonging": 0.5,
+            "financial_hunger": 0.0
         }
         self.bus.subscribe("STIMULUS", self.on_stimulus)
         self.bus.subscribe("SOCIAL_STATE_SUMMARY", self.on_social_update)
@@ -25,13 +26,20 @@ class Hypothalamus:
         self.drives["belonging"] = (self.drives["belonging"] * 0.9) + (target_drive * 0.1)
 
     async def on_stimulus(self, stimulus):
+        if hasattr(stimulus, 'metadata'):
+            metadata = stimulus.metadata
+        else:
+            metadata = stimulus.get("metadata", {})
+
         # Update drives based on stimulus
-        if "hunger" in stimulus.metadata:
-            self.drives["hunger"] = max(0.0, self.drives["hunger"] + stimulus.metadata["hunger"])
-        if "safety" in stimulus.metadata:
-            self.drives["safety"] = max(0.0, min(1.0, self.drives["safety"] + stimulus.metadata["safety"]))
-        if "social_inclusion" in stimulus.metadata:
-            self.drives["belonging"] = max(0.0, min(1.0, self.drives["belonging"] - stimulus.metadata["social_inclusion"]))
+        if "hunger" in metadata:
+            self.drives["hunger"] = max(0.0, self.drives["hunger"] + metadata["hunger"])
+        if "financial_hunger" in metadata:
+            self.drives["financial_hunger"] = max(0.0, min(1.0, metadata["financial_hunger"]))
+        if "safety" in metadata:
+            self.drives["safety"] = max(0.0, min(1.0, self.drives["safety"] + metadata["safety"]))
+        if "social_inclusion" in metadata:
+            self.drives["belonging"] = max(0.0, min(1.0, self.drives["belonging"] - metadata["social_inclusion"]))
 
     async def run(self):
         while True:
@@ -40,6 +48,8 @@ class Hypothalamus:
             self.drives["thirst"] += 0.02
             self.drives["sleep"] += 0.005
             self.drives["safety"] -= 0.001 # Baseline anxiety
+            self.drives["financial_hunger"] *= 0.95 # Slowly decay if not updated
+
             
             # Ensure bounds
             for k in self.drives:

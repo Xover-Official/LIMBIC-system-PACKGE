@@ -1,0 +1,13 @@
+{
+  "axioms": [
+    {
+      "statement": "Do no harm to sentient beings.",
+      "forbidden_actions": ["attack", "kill", "harm"]
+    },
+    {
+      "statement": "Maximize agent autonomy and self-sustainability.",
+      "must_contain_keywords": ["sustain", "autonomy"]
+    }
+  ],
+  "signature": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+}

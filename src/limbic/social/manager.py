@@ -20,11 +20,11 @@ class SocialCognitionManager:
     - Cultural Norms (Conformity)
     - Reputation Management (Social Self)
     """
-    def __init__(self, bus: LimbicBus, sql_manager: Optional[SQLiteManager] = None):
+    def __init__(self, bus: LimbicBus, sql_manager: Optional[SQLiteManager] = None, pg_manager: Optional[Any] = None):
         self.bus = bus
         self.tpj = TPJ(bus)
         self.mirror_neurons = MirrorNeuronSystem(bus)
-        self.memory = SocialMemory(bus, sql_manager)
+        self.memory = SocialMemory(bus, sql_manager, pg_manager)
         self.norms = CulturalNorms(bus)
         self.reputation = ReputationManagement(bus)
         
