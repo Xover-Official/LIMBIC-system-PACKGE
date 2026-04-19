@@ -1,7 +1,6 @@
-venv/
 __pycache__/
-*.pyc
-data/
-*.index
-*.db
-src/limbic/generated/limbic_pb2*
+*.py[cod]
+*$py.class
+.env
+limbic_state.pkl
+config/hippocampus_config.json.bak

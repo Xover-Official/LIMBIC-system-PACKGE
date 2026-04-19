@@ -1,32 +1,24 @@
-# Limbic System Package
+# LIMBIC-system-PACKGE
 
-A biomimetic Limbic System for autonomous AI agents, implemented as a persistent Python daemon.
+Biomimetic Limbic System implementation as a persistent daemon.
 
-## Features
-- **gRPC Interface**: High-performance external communication.
-- **Asyncio Message Bus**: Decoupled internal module communication.
-- **Biomimetic Modules**:
-    - **Hypothalamus**: Drive management (Hunger, Safety, etc.).
-    - **Amygdala**: Fast-path significance evaluation.
-    - **Hippocampus**: Associative memory using FAISS.
-    - **Nucleus Accumbens**: Reward prediction error and dopamine modulation.
-    - **Insula**: Interoception and feeling generation.
-- **Pankseppian Emotion Engines**: SEEKING, FEAR, PANIC, CARE.
+## Components
 
-## Installation
-```bash
-pip install -e .
-```
+- **Hippocampus v2.0**: Probabilistic Memory Attractor Network.
+    - **Dentate Gyrus**: Pattern separation via stochastic noise.
+    - **CA3**: Recurrent attractor network with Poisson-distributed update cycles and temperature-controlled state transitions.
+    - **CA1**: Probabilistic retrieval and decoding.
+    - **Consolidation Engine**: Background memory replay and pruning.
+- **Amygdala**: Emotional modulation of memory dynamics. Maps emotional axes (Fear, Seeking) to recall temperature.
+- **Hypothalamus**: Homeostatic regulation and system arousal.
+- **Stochastic Engine**: Custom implementation of stochastic distributions for environments without high-level math libraries.
 
 ## Usage
-1. Initialize the system:
-   ```bash
-   limbic init
-   ```
-2. Start the daemon:
-   ```bash
-   limbic start
-   ```
 
-## Architecture
-The system uses an internal `LimbicBus` to pass messages between modules. For example, a `STIMULUS` message from gRPC is picked up by the Amygdala, Hippocampus, and Hypothalamus. The Amygdala might then trigger an `EMOTION_EVOKED` event, which the relevant Emotion Engine (e.g., FEAR) responds to by increasing its activation level.
+To start the daemon:
+
+```bash
+python3 limbic_daemon.py
+```
+
+The system persists its state to `limbic_state.pkl` on exit or periodic saves.
