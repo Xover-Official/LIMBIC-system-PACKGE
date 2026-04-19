@@ -1,7 +1,8 @@
 import asyncio
 import logging
-from typing import Dict, Any, List, Set
+from typing import Dict, Any, List, Set, Optional
 from limbic.bus import LimbicBus
+from limbic.persistence.sqlite_manager import SQLiteManager
 
 logger = logging.getLogger(__name__)
 
@@ -10,20 +11,50 @@ class SocialMemory:
     Social Memory (Social-03): Graph-based tracking of trust and debt.
     Tracks trust levels, affinity, and social debts/credits.
     """
-    def __init__(self, bus: LimbicBus):
+    def __init__(self, bus: LimbicBus, sql_manager: Optional[SQLiteManager] = None):
         self.bus = bus
+        self.sql_manager = sql_manager
         self.nodes: Dict[str, Dict[str, Any]] = {}  # agent_id -> properties
         self.edges: Dict[str, Dict[str, Dict[str, Any]]] = {} # (id1, id2) -> relationship
 
     async def run(self):
         logger.info("Social Memory starting...")
+        
+        # Load from DB if available
+        if self.sql_manager:
+            await self._load_from_db()
+
         self.bus.subscribe("SOCIAL_TRANSACTION", self.on_transaction)
         self.bus.subscribe("AGENT_MODEL_UPDATED", self.on_agent_update)
         
         while True:
             # Periodically decay debts or update affinities
             await self._maintain_memory()
+            # Save to DB periodically
+            if self.sql_manager:
+                await self._save_to_db()
             await asyncio.sleep(60)
+
+    async def _load_from_db(self):
+        relationships = await self.sql_manager.get_social_relationships()
+        for row in relationships:
+            agent_id, trust, affinity, debt, interactions, _ = row
+            self._ensure_agent(agent_id)
+            rel = self.edges["self"][agent_id]
+            rel["trust"] = trust
+            rel["affinity"] = affinity
+            rel["debt"] = debt
+            rel["interactions"] = interactions
+
+    async def _save_to_db(self):
+        for agent_id, rel in self.edges.get("self", {}).items():
+            await self.sql_manager.update_social_relationship(
+                agent_id, 
+                rel["trust"], 
+                rel["affinity"], 
+                rel["debt"], 
+                rel["interactions"]
+            )
 
     async def on_transaction(self, data: Dict[str, Any]):
         agent_id = data.get("agent_id")
@@ -35,7 +66,7 @@ class SocialMemory:
 
         self._ensure_agent(agent_id)
         rel = self._get_relationship("self", agent_id)
-        
+        rel["interactions"] += 1
         if type == "favor":
             rel["debt"] -= value
             rel["trust"] += value * 0.1
