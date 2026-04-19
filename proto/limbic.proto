@@ -60,6 +60,11 @@ message LimbicState {
   string dominant_engine = 5;
   int64 timestamp = 6;
   ConsciousState consciousness = 7;
+  map<string, float> hormones = 8;
+  float phi = 9;
+  float ego_coherence = 10;
+  float meaning = 11;
+  float dread = 12;
 }
 
 message ConsciousState {
