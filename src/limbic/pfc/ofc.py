@@ -8,10 +8,11 @@ logger = logging.getLogger(__name__)
 class OFC:
     """
     Orbitofrontal Cortex: Bayesian value learner and utility calculator.
-    Uses multi-armed bandit style estimation for candidate plans.
+    Uses multi-armed bandit style estimation with risk-awareness.
     """
     def __init__(self, bus: LimbicBus):
         self.bus = bus
+        self.effort_level = 0.0
         # Simple action-value map (Bayesian prior)
         self.action_values = {
             "OBSERVE": {"mu": 0.1, "sigma": 0.1},
@@ -23,6 +24,10 @@ class OFC:
         }
         self.bus.subscribe("PLAN_VETTED", self.calculate_utility)
         self.bus.subscribe("REWARD_RECEIVED", self.update_values)
+        self.bus.subscribe("EFFORT_REQUIRED", self.on_effort_required)
+
+    async def on_effort_required(self, data):
+        self.effort_level = data.get("level", 0.0)
 
     async def calculate_utility(self, vetting_data):
         plan = vetting_data["plan"]
@@ -32,20 +37,29 @@ class OFC:
         val_params = self.action_values.get(action, {"mu": 0.0, "sigma": 0.5})
         
         # Expected Utility (EU) Calculation
-        # mu is our current mean estimate of utility
-        base_utility = val_params["mu"]
+        mu = val_params["mu"]
+        sigma = val_params["sigma"]
+        
+        # Risk-Aware Utility: subtract fraction of variance (risk aversion)
+        # Higher sigma means more uncertainty/risk
+        risk_penalty = 0.5 * sigma
+        base_utility = mu - risk_penalty
         
         # Factor in VMPFC vetting score (moral/social value)
         vetting_score = vetting_data.get("score", 0.5)
         
+        # Cost of Cognitive Effort (higher effort signals reduce utility of complex plans)
+        # Simplified: all cortical plans have some effort cost
+        effort_cost = self.effort_level * 0.1
+        
         # Final Utility calculation
-        final_utility = base_utility + (vetting_score * 0.4)
+        final_utility = base_utility + (vetting_score * 0.4) - effort_cost
         
         # Severe penalty if not approved by VMPFC
         if not vetting_data.get("approved"):
-            final_utility -= 1.5 
+            final_utility -= 2.0 
             
-        logger.info(f"OFC: Expected Utility for {action}: {final_utility:.4f} (Base: {base_utility:.4f}, Vetting: {vetting_score:.4f})")
+        logger.info(f"OFC: Utility for {action}: {final_utility:.4f} (Mu: {mu:.2f}, Risk: {risk_penalty:.2f}, Vetting: {vetting_score:.2f}, Effort: {effort_cost:.2f})")
         
         await self.bus.publish("UTILITY_ASSIGNED", {
             "id": pid,
