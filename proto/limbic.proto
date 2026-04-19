@@ -65,6 +65,9 @@ message LimbicState {
   float ego_coherence = 10;
   float meaning = 11;
   float dread = 12;
+  float age = 13;
+  float plasticity = 14;
+  float vagal_tone = 15;
 }
 
 message ConsciousState {

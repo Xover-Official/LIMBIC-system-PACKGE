@@ -13,13 +13,18 @@ class EndocrineOrchestrator:
             "oxytocin": 0.5,
             "dopamine": 0.4,
             "serotonin": 0.6,
-            "adrenaline": 0.1
+            "adrenaline": 0.1,
+            "melatonin": 0.1
         }
         self.hormones = dict(self.baselines)
         
         # Subscriptions
         self.bus.subscribe("STIMULUS", self.handle_stimulus)
         self.bus.subscribe("ENGINE_ACTIVE", self.handle_engine_active)
+        self.bus.subscribe("HORMONE_RELEASE", self.handle_hormone_release)
+
+    async def handle_hormone_release(self, data):
+        await self.release_hormone(data["hormone"], data["amount"])
 
     async def handle_stimulus(self, request):
         # Example: high threat stimulus increases cortisol and adrenaline

@@ -1,3 +1,21 @@
+Metadata-Version: 2.4
+Name: limbic-system
+Version: 0.1.0
+Summary: A biomimetic Limbic System for autonomous AI agents
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: grpcio>=1.60.0
+Requires-Dist: grpcio-tools>=1.60.0
+Requires-Dist: faiss-cpu>=1.7.4
+Requires-Dist: sqlalchemy>=2.0.0
+Requires-Dist: click>=8.1.0
+Requires-Dist: pydantic>=2.0.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: aiosqlite>=0.19.0
+Requires-Dist: streamlit>=1.28.0
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: plotly>=5.17.0
+
 # Limbic System Package
 
 A biomimetic Limbic System for autonomous AI agents, implemented as a persistent Python daemon.
@@ -17,11 +35,6 @@ A biomimetic Limbic System for autonomous AI agents, implemented as a persistent
     - **OFC**: Bayesian Value/Risk Learner.
     - **ACC**: Conflict Monitor and Resource Scaler.
     - **Executive Control**: Top-down override and action mediation.
-- **Project Omega Integration**:
-    - **Physiological**: Vagus Nerve interoceptive coupling and Pineal Gland circadian regulation.
-    - **Linguistic**: Broca/Wernicke semantic and production filters.
-    - **Developmental**: Age Layer with age-based plasticity decay.
-    - **Conscious**: Phi-governed Global Workspace with Thalamic gating.
 - **Pankseppian Emotion Engines**: SEEKING, FEAR, PANIC, CARE.
 - **Dashboard**: Real-time visualization using Streamlit.
 
