@@ -24,6 +24,18 @@ from limbic.pfc.ofc import OFC
 from limbic.pfc.acc import ACC
 from limbic.pfc.executive_control import ExecutiveControl
 
+# Sensorimotor Imports
+try:
+    from sensorimotor.registry import ToolRegistry
+    from sensorimotor.subcortical.cerebellum import Cerebellum
+    from sensorimotor.subcortical.basal_ganglia import BasalGanglia
+    from sensorimotor.cortex.sensory import SensoryCortex
+    from sensorimotor.cortex.motor import MotorCortex
+    SENSORIMOTOR_AVAILABLE = True
+except ImportError:
+    logger.warning("sensorimotor-system package not found. Sensorimotor features will be disabled.")
+    SENSORIMOTOR_AVAILABLE = False
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -95,6 +107,18 @@ class LimbicDaemon:
             "PANIC": PanicEngine(self.bus),
             "CARE": CareEngine(self.bus)
         }
+
+        # Sensorimotor Integration
+        if SENSORIMOTOR_AVAILABLE:
+            self.tool_registry = ToolRegistry()
+            self.cerebellum = Cerebellum()
+            self.basal_ganglia = BasalGanglia(self.bus)
+            self.sensory_cortex = SensoryCortex(self.bus, self.cerebellum)
+            self.motor_cortex = MotorCortex(self.bus, self.tool_registry, self.cerebellum)
+            
+            # Register basic tools
+            self.tool_registry.register_tool("move", "Move the agent", lambda x=0, y=0: f"Moved to {x}, {y}")
+            self.tool_registry.register_tool("grasp", "Grasp an object", lambda item="nothing": f"Grasped {item}")
         
         # Current Global State
         self.arousal = 0.5
@@ -113,6 +137,8 @@ class LimbicDaemon:
         self.bus.subscribe("PLAN_VETTED", self.on_plan_vetted)
         self.bus.subscribe("UTILITY_ASSIGNED", self.on_utility_assigned)
         self.bus.subscribe("ACTION_COMMAND", self.on_action_command)
+        self.bus.subscribe("ACTION_RESULT", self.on_action_result)
+        self.bus.subscribe("ACTION_FAILURE", self.on_action_failure)
 
     def update_drives(self, drives):
         self.current_drives = drives
@@ -147,6 +173,18 @@ class LimbicDaemon:
         action = command["action"]
         if action in self.active_plans:
             self.active_plans[action]["status"] = "EXECUTING"
+
+    def on_action_result(self, result):
+        action = result["action"]
+        if action in self.active_plans:
+            self.active_plans[action]["status"] = "COMPLETED"
+            self.active_plans[action]["result"] = result["result"]
+
+    def on_action_failure(self, failure):
+        action = failure["action"]
+        if action in self.active_plans:
+            self.active_plans[action]["status"] = "FAILED"
+            self.active_plans[action]["error"] = failure["error"]
 
     def get_current_state(self):
         dominant = "CALM"
@@ -188,6 +226,11 @@ class LimbicDaemon:
             asyncio.create_task(self.engines["PANIC"].run()),
             asyncio.create_task(self.engines["CARE"].run()),
         ]
+
+        if SENSORIMOTOR_AVAILABLE:
+            for component in [self.sensory_cortex, self.motor_cortex, self.basal_ganglia]:
+                if hasattr(component, "run") and asyncio.iscoroutinefunction(component.run):
+                    tasks.append(asyncio.create_task(component.run()))
         
         try:
             await server.wait_for_termination()

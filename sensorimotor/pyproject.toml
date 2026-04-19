@@ -1,0 +1,13 @@
+[project]
+name = "sensorimotor-system"
+version = "0.1.0"
+description = "Embodied interface for the Limbic System"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24.0",
+    "pydantic>=2.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
