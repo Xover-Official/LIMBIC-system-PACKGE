@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: limbic-daemon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: limbic-daemon
+  template:
+    metadata:
+      labels:
+        app: limbic-daemon
+    spec:
+      containers:
+      - name: limbic-daemon
+        image: xover/limbic-daemon:latest
+        ports:
+        - containerPort: 50051
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: db-secrets
+              key: dsn
+        - name: AGENT_ID
+          value: "agent-001"
+        - name: AXIOMS_PUBLIC_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: limbic-config
+              key: axioms_public_key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: limbic-daemon
+spec:
+  selector:
+    app: limbic-daemon
+  ports:
+    - protocol: TCP
+      port: 50051
+      targetPort: 50051
