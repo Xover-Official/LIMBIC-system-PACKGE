@@ -21,7 +21,14 @@ class CulturalNorms:
         self.bus.subscribe("PLAN_EVALUATED", self.apply_conformity_bias)
         
         while True:
-            await asyncio.sleep(1)
+            # Decay norm frequencies over time to allow for cultural shift
+            await self._decay_norms()
+            await asyncio.sleep(60)
+
+    async def _decay_norms(self):
+        for context in self.context_norms:
+            for action in self.context_norms[context]:
+                self.context_norms[context][action] *= 0.95
 
     async def on_observation(self, data: Dict[str, Any]):
         action = data.get("action")

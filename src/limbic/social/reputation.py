@@ -54,5 +54,23 @@ class ReputationManagement:
 
     async def on_relationship_update(self, data: Dict[str, Any]):
         # If many people trust us, our reputation goes up
-        # This is a simplification
-        pass
+        trust = data.get("trust", 0.0)
+        affinity = data.get("affinity", 0.0)
+        
+        # Weighted update to reputation
+        self.reputation = (self.reputation * 0.95) + (max(0.0, trust) * 0.03) + (max(0.0, affinity) * 0.02)
+        self.reputation = max(0.0, min(1.0, self.reputation))
+        
+        # Update self-concept based on relationships
+        if trust > 0.5:
+            self.self_concept["integrity"] = (self.self_concept["integrity"] * 0.99) + 0.01
+        elif trust < -0.5:
+            self.self_concept["integrity"] = (self.self_concept["integrity"] * 0.99) - 0.01
+            
+        if affinity > 0.5:
+            self.self_concept["likability"] = (self.self_concept["likability"] * 0.99) + 0.01
+        elif affinity < -0.5:
+            self.self_concept["likability"] = (self.self_concept["likability"] * 0.99) - 0.01
+            
+        for k in self.self_concept:
+            self.self_concept[k] = max(0.0, min(1.0, self.self_concept[k]))

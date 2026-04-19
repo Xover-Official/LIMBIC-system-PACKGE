@@ -18,6 +18,16 @@ class SQLiteManager:
                     timestamp INTEGER
                 )
             """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS social_relationships (
+                    agent_id TEXT PRIMARY KEY,
+                    trust REAL,
+                    affinity REAL,
+                    debt REAL,
+                    interactions INTEGER,
+                    last_updated INTEGER
+                )
+            """)
             await db.commit()
 
     async def log_event(self, topic, data):
@@ -27,6 +37,25 @@ class SQLiteManager:
                 (topic, json.dumps(data), int(time.time()))
             )
             await db.commit()
+
+    async def update_social_relationship(self, agent_id, trust, affinity, debt, interactions):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("""
+                INSERT INTO social_relationships (agent_id, trust, affinity, debt, interactions, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(agent_id) DO UPDATE SET
+                    trust=excluded.trust,
+                    affinity=excluded.affinity,
+                    debt=excluded.debt,
+                    interactions=excluded.interactions,
+                    last_updated=excluded.last_updated
+            """, (agent_id, trust, affinity, debt, interactions, int(time.time())))
+            await db.commit()
+
+    async def get_social_relationships(self):
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("SELECT * FROM social_relationships") as cursor:
+                return await cursor.fetchall()
 
 class EventLogger:
     def __init__(self, bus: LimbicBus, manager: SQLiteManager):

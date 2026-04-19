@@ -1,7 +1,8 @@
 import asyncio
 import logging
-from typing import List
+from typing import List, Optional
 from limbic.bus import LimbicBus
+from limbic.persistence.sqlite_manager import SQLiteManager
 from limbic.social.tpj import TPJ
 from limbic.social.mirror_neurons import MirrorNeuronSystem
 from limbic.social.memory import SocialMemory
@@ -19,11 +20,11 @@ class SocialCognitionManager:
     - Cultural Norms (Conformity)
     - Reputation Management (Social Self)
     """
-    def __init__(self, bus: LimbicBus):
+    def __init__(self, bus: LimbicBus, sql_manager: Optional[SQLiteManager] = None):
         self.bus = bus
         self.tpj = TPJ(bus)
         self.mirror_neurons = MirrorNeuronSystem(bus)
-        self.memory = SocialMemory(bus)
+        self.memory = SocialMemory(bus, sql_manager)
         self.norms = CulturalNorms(bus)
         self.reputation = ReputationManagement(bus)
         

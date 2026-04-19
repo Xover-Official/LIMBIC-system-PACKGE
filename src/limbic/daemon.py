@@ -134,7 +134,7 @@ class LimbicDaemon:
         self.psych_lattice = PsychologicalLattice(self.bus)
         self.existential_layer = ExistentialLayer(self.bus)
         self.social_genome = SocioculturalGenome(self.bus)
-        self.social_cognition = SocialCognitionManager(self.bus)
+        self.social_cognition = SocialCognitionManager(self.bus, self.sql_manager)
         self.consciousness_v2 = ConsciousnessSystemV2(self.bus)
         
         # Project Omega Systems

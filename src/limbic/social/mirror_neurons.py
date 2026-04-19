@@ -17,7 +17,10 @@ class MirrorNeuronSystem:
             "distress": 0.7,
             "joy": 0.5,
             "anger": 0.4,
-            "fear": 0.6
+            "fear": 0.6,
+            "sadness": 0.5,
+            "pain": 0.8,
+            "surprise": 0.3
         }
 
     async def run(self):
