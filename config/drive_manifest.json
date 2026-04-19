@@ -1,0 +1,14 @@
+{
+    "drives": {
+        "hunger": { "decay": 0.01, "initial": 0.0 },
+        "thirst": { "decay": 0.02, "initial": 0.0 },
+        "sleep": { "decay": 0.005, "initial": 0.0 },
+        "safety": { "decay": -0.001, "initial": 1.0 }
+    },
+    "engines": {
+        "seeking": { "sensitivity": 1.0, "decay": 0.95 },
+        "fear": { "sensitivity": 1.2, "decay": 0.8 },
+        "panic": { "sensitivity": 1.0, "decay": 0.9 },
+        "care": { "sensitivity": 0.8, "decay": 0.95 }
+    }
+}

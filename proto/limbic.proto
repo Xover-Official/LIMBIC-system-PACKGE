@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package limbic;
+
+service LimbicService {
+  rpc InjectStimulus (StimulusRequest) returns (LimbicResponse);
+  rpc GetLimbicState (Empty) returns (LimbicState);
+  rpc StreamState (Empty) returns (stream LimbicState);
+}
+
+message Empty {}
+
+message StimulusRequest {
+  string source = 1;
+  string content = 2;
+  repeated float embedding = 3;
+  map<string, float> metadata = 4;
+}
+
+message LimbicResponse {
+  bool accepted = 1;
+  string message = 2;
+}
+
+message LimbicState {
+  float arousal = 1;
+  float valence = 2;
+  map<string, float> drives = 3;
+  map<string, float> emotions = 4;
+  string dominant_engine = 5;
+  int64 timestamp = 6;
+}
