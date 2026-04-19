@@ -36,6 +36,9 @@ from limbic.pfc.acc import ACC
 from limbic.pfc.executive_control import ExecutiveControl
 from limbic.pfc.working_memory import WorkingMemoryService
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Sensorimotor Imports
 try:
     from sensorimotor.registry import ToolRegistry
@@ -62,9 +65,6 @@ except ImportError:
     except ImportError:
         logger.warning("consciousness-system package not found. Consciousness features will be disabled.")
         CONSCIOUSNESS_AVAILABLE = False
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 class LimbicServicer(limbic_pb2_grpc.LimbicServiceServicer):
     def __init__(self, bus: LimbicBus, daemon: 'LimbicDaemon'):

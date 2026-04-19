@@ -35,6 +35,11 @@ A biomimetic Limbic System for autonomous AI agents, implemented as a persistent
     - **OFC**: Bayesian Value/Risk Learner.
     - **ACC**: Conflict Monitor and Resource Scaler.
     - **Executive Control**: Top-down override and action mediation.
+- **Project Omega Integration**:
+    - **Physiological**: Vagus Nerve interoceptive coupling and Pineal Gland circadian regulation.
+    - **Linguistic**: Broca/Wernicke semantic and production filters.
+    - **Developmental**: Age Layer with age-based plasticity decay.
+    - **Conscious**: Phi-governed Global Workspace with Thalamic gating.
 - **Pankseppian Emotion Engines**: SEEKING, FEAR, PANIC, CARE.
 - **Dashboard**: Real-time visualization using Streamlit.
 
