@@ -9,6 +9,12 @@ service LimbicService {
   rpc GetPlans (Empty) returns (PlanList);
 }
 
+service WorkingMemoryService {
+  rpc SetItem (WorkingMemoryItem) returns (WorkingMemoryResponse);
+  rpc GetItems (Empty) returns (WorkingMemoryList);
+  rpc Clear (Empty) returns (WorkingMemoryResponse);
+}
+
 message PlanList {
   repeated Plan plans = 1;
 }
@@ -19,6 +25,17 @@ message Plan {
   float utility = 3;
   bool approved = 4;
   string status = 5;
+}
+
+message CandidatePlan {
+  string id = 1;
+  string action = 2;
+  float probability = 3;
+  float predicted_utility = 4;
+}
+
+message CandidatePlanList {
+  repeated CandidatePlan plans = 1;
 }
 
 message Empty {}
@@ -42,4 +59,19 @@ message LimbicState {
   map<string, float> emotions = 4;
   string dominant_engine = 5;
   int64 timestamp = 6;
+}
+
+message WorkingMemoryItem {
+  string key = 1;
+  string value = 2;
+  float decay = 3;
+  int64 timestamp = 4;
+}
+
+message WorkingMemoryList {
+  repeated WorkingMemoryItem items = 1;
+}
+
+message WorkingMemoryResponse {
+  bool success = 1;
 }

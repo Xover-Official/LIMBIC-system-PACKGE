@@ -5,15 +5,27 @@ class CareEngine:
     def __init__(self, bus: LimbicBus):
         self.bus = bus
         self.activation = 0.0
-        self.bus.subscribe("STIMULUS", self.on_stimulus)
+        self.suppressed = False
+        self.bus.subscribe("EMOTION_EVOKED", self.on_emotion)
+        self.bus.subscribe("LIMBIC_OVERRIDE", self.on_override)
 
-    async def on_stimulus(self, stimulus):
-        if "social" in stimulus.content.lower() or "friendly" in stimulus.content.lower():
-            self.activation = min(1.0, self.activation + 0.3)
+    async def on_emotion(self, emotion):
+        if emotion["type"] == "CARE":
+            new_activation = max(self.activation, emotion["arousal"])
+            if self.suppressed:
+                self.activation = new_activation * 0.5
+            else:
+                self.activation = new_activation
+
+    async def on_override(self, override):
+        if "CARE" in override.get("suppress", []):
+            self.suppressed = True
+        else:
+            self.suppressed = False
 
     async def run(self):
         while True:
-            self.activation *= 0.95
+            self.activation *= 0.9
             if self.activation > 0.3:
                 await self.bus.publish("ENGINE_ACTIVE", {"name": "CARE", "level": self.activation})
-            await asyncio.sleep(3)
+            await asyncio.sleep(2)

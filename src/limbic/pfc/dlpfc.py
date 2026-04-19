@@ -1,81 +1,118 @@
 import asyncio
 import time
 import logging
+import uuid
+import random
 from typing import List, Dict, Any
+import grpc
 from limbic.bus import LimbicBus
+from limbic.generated import limbic_pb2, limbic_pb2_grpc
 
 logger = logging.getLogger(__name__)
-
-class WorkingMemoryItem:
-    def __init__(self, content: Any, importance: float = 1.0):
-        self.content = content
-        self.importance = importance
-        self.timestamp = time.time()
-
-    def get_relevance(self, decay_rate: float = 0.1) -> float:
-        elapsed = time.time() - self.timestamp
-        return self.importance * (2.71828 ** (-decay_rate * elapsed))
 
 class DLPFC:
     """
     Dorsolateral Prefrontal Cortex: Responsible for planning, executive control, 
-    and maintaining working memory.
+    and maintaining working memory via gRPC.
     """
-    def __init__(self, bus: LimbicBus):
+    def __init__(self, bus: LimbicBus, wm_address: str = "localhost:50051"):
         self.bus = bus
-        self.working_memory: List[WorkingMemoryItem] = []
-        self.max_wm_size = 7  # Miller's Law
-        self.decay_rate = 0.05
+        self.wm_address = wm_address
+        self.iterations = 10
         
         self.bus.subscribe("STIMULUS", self.on_stimulus)
         self.bus.subscribe("CONTEXT_RECALLED", self.on_context_recalled)
         self.bus.subscribe("CONFLICT_DETECTED", self.on_conflict)
+        self.bus.subscribe("EFFORT_REQUIRED", self.on_effort_required)
+
+    async def _get_wm_stub(self):
+        # We use the same address as the daemon's gRPC server
+        channel = grpc.aio.insecure_channel(self.wm_address)
+        return limbic_pb2_grpc.WorkingMemoryServiceStub(channel)
+
+    async def add_to_working_memory(self, key: str, value: str, importance: float = 1.0):
+        try:
+            stub = await self._get_wm_stub()
+            await stub.SetItem(limbic_pb2.WorkingMemoryItem(
+                key=key,
+                value=value,
+                decay=0.1 / max(0.1, importance)
+            ))
+        except Exception as e:
+            logger.debug(f"DLPFC: Working memory update skipped (expected during startup): {e}")
+
+    async def get_working_memory(self) -> List[limbic_pb2.WorkingMemoryItem]:
+        try:
+            stub = await self._get_wm_stub()
+            response = await stub.GetItems(limbic_pb2.Empty())
+            return response.items
+        except Exception as e:
+            logger.debug(f"DLPFC: Working memory query skipped: {e}")
+            return []
 
     async def on_stimulus(self, stimulus):
-        self.add_to_working_memory(stimulus.content, importance=0.8)
+        content = getattr(stimulus, 'content', str(stimulus))
+        await self.add_to_working_memory(f"stimulus_{int(time.time())}", content, importance=0.8)
         await self.replan()
 
     async def on_context_recalled(self, contexts):
-        for ctx in contexts:
-            self.add_to_working_memory(ctx, importance=0.5)
+        for i, ctx in enumerate(contexts):
+            await self.add_to_working_memory(f"context_{i}_{int(time.time())}", str(ctx), importance=0.5)
         await self.replan()
 
     async def on_conflict(self, conflict_data):
         logger.info(f"DLPFC: Conflict detected, increasing effort. {conflict_data}")
-        # Scale effort: more iterations in planning
-        await self.replan(iterations=20)
+        await self.replan(iterations=self.iterations * 2)
 
-    def add_to_working_memory(self, content, importance=1.0):
-        self.working_memory.append(WorkingMemoryItem(content, importance))
-        # Keep only relevant items and limit size
-        self.working_memory = sorted(
-            [item for item in self.working_memory if item.get_relevance(self.decay_rate) > 0.1],
-            key=lambda x: x.get_relevance(self.decay_rate),
-            reverse=True
-        )[:self.max_wm_size]
+    async def on_effort_required(self, effort_data):
+        level = effort_data.get("level", 0.5)
+        logger.info(f"DLPFC: High effort signaled ({level}), increasing iterations.")
+        self.iterations = min(50, int(self.iterations * (1 + level)))
 
-    async def replan(self, iterations=10):
-        # MCTS-inspired simplified planning
-        # In a real scenario, this would explore possible action sequences
-        current_context = [item.content for item in self.working_memory]
+    async def replan(self, iterations=None):
+        if iterations is None:
+            iterations = self.iterations
+
+        wm_items = await self.get_working_memory()
+        current_context = [item.value for item in wm_items]
+        
         if not current_context:
-            return
+            # Add a default context if empty to allow planning
+            current_context = ["idle"]
 
-        logger.info(f"DLPFC: Planning with context: {current_context}")
+        planning_id = str(uuid.uuid4())
+        logger.info(f"DLPFC: Probabilistic planning ({planning_id}) with context: {current_context}")
         
-        # Simulate tree search
-        best_plan = {"action": "OBSERVE", "confidence": 0.5}
+        # Probabilistic sampling of potential actions
+        potential_actions = ["OBSERVE", "EXPLORE", "DEFEND", "COOPERATE", "RETREAT", "STAY"]
         
-        # Logic for choosing action based on context
-        if any("threat" in str(c).lower() for c in current_context):
-            best_plan = {"action": "DEFEND", "confidence": 0.9}
-        elif any("reward" in str(c).lower() for c in current_context):
-            best_plan = {"action": "EXPLORE", "confidence": 0.8}
+        # Heuristics based on context
+        context_str = " ".join(current_context).lower()
+        weights = {action: 1.0 for action in potential_actions}
+        
+        if any(word in context_str for word in ["threat", "fear", "danger", "enemy"]):
+            weights["DEFEND"] += 5.0
+            weights["RETREAT"] += 3.0
+        if any(word in context_str for word in ["reward", "food", "goal", "interesting"]):
+            weights["EXPLORE"] += 4.0
+            weights["COOPERATE"] += 2.0
+        if any(word in context_str for word in ["social", "friend", "ally", "other"]):
+            weights["COOPERATE"] += 5.0
 
-        await self.bus.publish("PLAN_GENERATED", best_plan)
+        # Sample multiple candidate plans
+        num_candidates = max(2, min(5, iterations // 2))
+        sampled_actions = random.choices(potential_actions, weights=list(weights.values()), k=num_candidates)
+        
+        for action in set(sampled_actions):
+            plan = {
+                "id": planning_id,
+                "action": action,
+                "probability": weights[action] / sum(weights.values()),
+                "context": current_context
+            }
+            await self.bus.publish("CANDIDATE_PLAN", plan)
 
     async def run(self):
         while True:
-            # Periodic cleanup of working memory
-            self.working_memory = [item for item in self.working_memory if item.get_relevance(self.decay_rate) > 0.1]
-            await asyncio.sleep(5)
+            # Maintain planning cycle or check for drift
+            await asyncio.sleep(10)
