@@ -37,6 +37,21 @@ except ImportError:
     logger.warning("sensorimotor-system package not found. Sensorimotor features will be disabled.")
     SENSORIMOTOR_AVAILABLE = False
 
+# Consciousness Imports
+try:
+    from consciousness.integration import ConsciousnessSystem
+    CONSCIOUSNESS_AVAILABLE = True
+except ImportError:
+    import sys
+    import os
+    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "consciousness_system", "src"))
+    try:
+        from consciousness.integration import ConsciousnessSystem
+        CONSCIOUSNESS_AVAILABLE = True
+    except ImportError:
+        logger.warning("consciousness-system package not found. Consciousness features will be disabled.")
+        CONSCIOUSNESS_AVAILABLE = False
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -110,6 +125,14 @@ class LimbicDaemon:
             "CARE": CareEngine(self.bus)
         }
 
+        # Consciousness
+        if CONSCIOUSNESS_AVAILABLE:
+            self.consciousness = ConsciousnessSystem(self.bus)
+            self.current_focus = ""
+            self.focus_salience = 0.0
+            self.self_narrative = ""
+            self.attention_schema = {}
+
         # Sensorimotor Integration
         if SENSORIMOTOR_AVAILABLE:
             self.tool_registry = ToolRegistry()
@@ -142,6 +165,22 @@ class LimbicDaemon:
         self.bus.subscribe("ACTION_COMMAND", self.on_action_command)
         self.bus.subscribe("ACTION_RESULT", self.on_action_result)
         self.bus.subscribe("ACTION_FAILURE", self.on_action_failure)
+
+        # Consciousness Subscriptions
+        if CONSCIOUSNESS_AVAILABLE:
+            self.bus.subscribe("WORKSPACE_BROADCAST", self.update_consciousness_focus)
+            self.bus.subscribe("SELF_STATE_UPDATE", self.update_self_state)
+            self.bus.subscribe("ATTENTION_SCHEMA_UPDATE", self.update_attention_schema)
+
+    def update_consciousness_focus(self, broadcast):
+        self.current_focus = broadcast["topic"]
+        self.focus_salience = broadcast["salience"]
+
+    def update_self_state(self, state):
+        self.self_narrative = state["narrative"]
+
+    def update_attention_schema(self, schema):
+        self.attention_schema = schema
 
     def update_drives(self, drives):
         self.current_drives = drives
@@ -194,13 +233,29 @@ class LimbicDaemon:
         if self.active_engines:
             dominant = max(self.active_engines, key=self.active_engines.get)
             
+        consciousness_state = None
+        if CONSCIOUSNESS_AVAILABLE:
+            # We use limbic_pb2 if it has been regenerated, otherwise we might have issues
+            # But we are supposed to have updated the proto
+            try:
+                consciousness_state = limbic_pb2.ConsciousState(
+                    current_focus=self.current_focus,
+                    focus_salience=self.focus_salience,
+                    self_narrative=self.self_narrative,
+                    attention_schema=self.attention_schema
+                )
+            except (AttributeError, TypeError):
+                # Fallback if proto was not regenerated or fields don't exist in generated code
+                pass
+
         return limbic_pb2.LimbicState(
             arousal=self.arousal,
             valence=self.valence,
             drives=self.current_drives,
             emotions=self.active_engines,
             dominant_engine=dominant,
-            timestamp=int(time.time())
+            timestamp=int(time.time()),
+            consciousness=consciousness_state
         )
 
     async def run(self):
@@ -231,6 +286,9 @@ class LimbicDaemon:
             asyncio.create_task(self.engines["PANIC"].run()),
             asyncio.create_task(self.engines["CARE"].run()),
         ]
+
+        if CONSCIOUSNESS_AVAILABLE:
+            tasks.append(asyncio.create_task(self.consciousness.run()))
 
         if SENSORIMOTOR_AVAILABLE:
             for component in [self.sensory_cortex, self.motor_cortex, self.basal_ganglia]:

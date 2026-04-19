@@ -59,6 +59,14 @@ message LimbicState {
   map<string, float> emotions = 4;
   string dominant_engine = 5;
   int64 timestamp = 6;
+  ConsciousState consciousness = 7;
+}
+
+message ConsciousState {
+  string current_focus = 1;
+  float focus_salience = 2;
+  string self_narrative = 3;
+  map<string, float> attention_schema = 4;
 }
 
 message WorkingMemoryItem {
