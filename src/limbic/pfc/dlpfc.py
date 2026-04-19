@@ -3,6 +3,7 @@ import time
 import logging
 import uuid
 import random
+import json
 from typing import List, Dict, Any
 import grpc
 from limbic.bus import LimbicBus
@@ -19,11 +20,14 @@ class DLPFC:
         self.bus = bus
         self.wm_address = wm_address
         self.iterations = 10
+        self.pending_strategies = {} # planning_id -> {action: strategy}
         
         self.bus.subscribe("STIMULUS", self.on_stimulus)
         self.bus.subscribe("CONTEXT_RECALLED", self.on_context_recalled)
         self.bus.subscribe("CONFLICT_DETECTED", self.on_conflict)
         self.bus.subscribe("EFFORT_REQUIRED", self.on_effort_required)
+        self.bus.subscribe("ACTION_RESULT", self.on_action_result)
+        self.bus.subscribe("ACTION_COMMAND", self.on_action_command)
 
     async def _get_wm_stub(self):
         # We use the same address as the daemon's gRPC server
@@ -69,6 +73,52 @@ class DLPFC:
         logger.info(f"DLPFC: High effort signaled ({level}), increasing iterations.")
         self.iterations = min(50, int(self.iterations * (1 + level)))
 
+    async def on_action_command(self, command):
+        if command.get("source") == "PFC":
+            pid = command.get("id")
+            action = command.get("action")
+            if pid in self.pending_strategies and action in self.pending_strategies[pid]:
+                strategy = self.pending_strategies[pid][action]
+                logger.info(f"DLPFC: Action command received for {action}. Storing strategy: {strategy}")
+                await self.add_to_working_memory("active_strategy", json.dumps(strategy), importance=0.9)
+            
+            # Clean up old pending strategies
+            if len(self.pending_strategies) > 50:
+                self.pending_strategies.clear()
+
+    async def on_action_result(self, result):
+        action = result.get("action")
+        success = result.get("success", True)
+        logger.info(f"DLPFC: Action {action} result: {'success' if success else 'failure'}")
+        
+        if success:
+            # Check for next step in active strategy
+            wm_items = await self.get_working_memory()
+            strategy_item = next((item for item in wm_items if item.key == "active_strategy"), None)
+            if strategy_item:
+                try:
+                    strategy = json.loads(strategy_item.value)
+                    if strategy and strategy[0] == action:
+                        next_steps = strategy[1:]
+                        if next_steps:
+                            next_action = next_steps[0]
+                            logger.info(f"DLPFC: Strategy progression. Next: {next_action}")
+                            await self.add_to_working_memory("active_strategy", json.dumps(next_steps), importance=0.9)
+                            
+                            planning_id = str(uuid.uuid4())
+                            plan = {
+                                "id": planning_id,
+                                "action": next_action,
+                                "probability": 1.0,
+                                "context": [item.value for item in wm_items]
+                            }
+                            await self.bus.publish("CANDIDATE_PLAN", plan)
+                        else:
+                            logger.info("DLPFC: Strategy completed.")
+                            await self.add_to_working_memory("active_strategy", "[]", importance=0.1)
+                except Exception as e:
+                    logger.error(f"DLPFC: Error processing strategy: {e}")
+
     async def replan(self, iterations=None):
         if iterations is None:
             iterations = self.iterations
@@ -77,11 +127,10 @@ class DLPFC:
         current_context = [item.value for item in wm_items]
         
         if not current_context:
-            # Add a default context if empty to allow planning
             current_context = ["idle"]
 
         planning_id = str(uuid.uuid4())
-        logger.info(f"DLPFC: Probabilistic planning ({planning_id}) with context: {current_context}")
+        logger.info(f"DLPFC: Strategic planning ({planning_id}) with context: {current_context}")
         
         # Probabilistic sampling of potential actions
         potential_actions = ["OBSERVE", "EXPLORE", "DEFEND", "COOPERATE", "RETREAT", "STAY"]
@@ -101,13 +150,28 @@ class DLPFC:
 
         # Sample multiple candidate plans
         num_candidates = max(2, min(5, iterations // 2))
-        sampled_actions = random.choices(potential_actions, weights=list(weights.values()), k=num_candidates)
+        self.pending_strategies[planning_id] = {}
         
-        for action in set(sampled_actions):
+        for _ in range(num_candidates):
+            first_action = random.choices(potential_actions, weights=list(weights.values()), k=1)[0]
+            strategy = [first_action]
+            
+            # Simple heuristic for next steps (strategic planning)
+            if first_action == "OBSERVE":
+                strategy.extend(random.choices(["EXPLORE", "COOPERATE"], k=1))
+            elif first_action == "EXPLORE":
+                strategy.extend(random.choices(["OBSERVE", "STAY"], k=1))
+            elif first_action == "DEFEND":
+                strategy.extend(["RETREAT"])
+            elif first_action == "COOPERATE":
+                strategy.extend(random.choices(["COOPERATE", "STAY"], k=1))
+            
+            self.pending_strategies[planning_id][first_action] = strategy
+            
             plan = {
                 "id": planning_id,
-                "action": action,
-                "probability": weights[action] / sum(weights.values()),
+                "action": first_action,
+                "probability": weights[first_action] / sum(weights.values()),
                 "context": current_context
             }
             await self.bus.publish("CANDIDATE_PLAN", plan)
