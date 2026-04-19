@@ -20,6 +20,10 @@ from limbic.engines.care import CareEngine
 # New High-Fidelity Human Analog Imports
 from limbic.core.endocrine import EndocrineOrchestrator
 from limbic.core.consciousness import ConsciousnessSystemV2
+from limbic.core.vagus_nerve import VagusNerve
+from limbic.core.pineal_gland import PinealGland
+from limbic.core.developmental import AgeLayer
+from limbic.linguistic.filters import WernickeFilter, BrocaFilter
 from limbic.psychology.lattice import PsychologicalLattice
 from limbic.psychology.existential import ExistentialLayer
 from limbic.social.genome import SocioculturalGenome
@@ -131,6 +135,13 @@ class LimbicDaemon:
         self.social_genome = SocioculturalGenome(self.bus)
         self.consciousness_v2 = ConsciousnessSystemV2(self.bus)
         
+        # Project Omega Systems
+        self.vagus_nerve = VagusNerve(self.bus)
+        self.pineal_gland = PinealGland(self.bus)
+        self.wernicke = WernickeFilter(self.bus)
+        self.broca = BrocaFilter(self.bus)
+        self.age_layer = AgeLayer(self.bus)
+        
         # Engines
         self.engines = {
             "SEEKING": SeekingEngine(self.bus),
@@ -170,6 +181,9 @@ class LimbicDaemon:
         self.ego_coherence = 1.0
         self.meaning = 0.5
         self.dread = 0.0
+        self.age = 0.0
+        self.plasticity = 1.0
+        self.vagal_tone = 0.5
         
         # Subscribe to updates for global state
         self.bus.subscribe("DRIVE_UPDATE", self.update_drives)
@@ -179,6 +193,8 @@ class LimbicDaemon:
         self.bus.subscribe("PHI_UPDATE", self.update_phi)
         self.bus.subscribe("PSYCH_STATE", self.update_psych)
         self.bus.subscribe("EXISTENTIAL_STATE", self.update_existential)
+        self.bus.subscribe("DEVELOPMENTAL_STATE", self.update_developmental_state)
+        self.bus.subscribe("VAGAL_TONE", self.update_vagal_tone)
         
         # Subscribe to PFC events
         self.bus.subscribe("PLAN_GENERATED", self.on_plan_generated)
@@ -217,6 +233,13 @@ class LimbicDaemon:
     def update_existential(self, state):
         self.meaning = state["meaning"]
         self.dread = state["dread"]
+
+    def update_developmental_state(self, data):
+        self.age = data["age"]
+        self.plasticity = data["plasticity"]
+
+    def update_vagal_tone(self, data):
+        self.vagal_tone = data["tone"]
 
     def update_drives(self, drives):
         self.current_drives = drives
@@ -284,20 +307,28 @@ class LimbicDaemon:
                 # Fallback if proto was not regenerated or fields don't exist in generated code
                 pass
 
-        return limbic_pb2.LimbicState(
-            arousal=self.arousal,
-            valence=self.valence,
-            drives=self.current_drives,
-            emotions=self.active_engines,
-            dominant_engine=dominant,
-            timestamp=int(time.time()),
-            consciousness=consciousness_state,
-            hormones=self.hormones,
-            phi=self.phi,
-            ego_coherence=self.ego_coherence,
-            meaning=self.meaning,
-            dread=self.dread
-        )
+        # Project Omega: Add new fields if they exist in the generated proto
+        kwargs = {
+            "arousal": self.arousal,
+            "valence": self.valence,
+            "drives": self.current_drives,
+            "emotions": self.active_engines,
+            "dominant_engine": dominant,
+            "timestamp": int(time.time()),
+            "consciousness": consciousness_state,
+            "hormones": self.hormones,
+            "phi": self.phi,
+            "ego_coherence": self.ego_coherence,
+            "meaning": self.meaning,
+            "dread": self.dread
+        }
+        
+        # Check if new fields are supported by the current limbic_pb2.LimbicState
+        for field in ["age", "plasticity", "vagal_tone"]:
+            if hasattr(limbic_pb2.LimbicState, field) or field in limbic_pb2.LimbicState.DESCRIPTOR.fields_by_name:
+                kwargs[field] = getattr(self, field)
+
+        return limbic_pb2.LimbicState(**kwargs)
 
     async def run(self):
         await self.sql_manager.init_db()
@@ -331,6 +362,9 @@ class LimbicDaemon:
             asyncio.create_task(self.existential_layer.run()),
             asyncio.create_task(self.social_genome.run()),
             asyncio.create_task(self.consciousness_v2.run()),
+            asyncio.create_task(self.vagus_nerve.run()),
+            asyncio.create_task(self.pineal_gland.run()),
+            asyncio.create_task(self.age_layer.run()),
         ]
 
         if CONSCIOUSNESS_AVAILABLE:
