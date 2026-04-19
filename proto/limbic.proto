@@ -71,18 +71,32 @@ message LimbicState {
   SocialState social = 16;
   EconomicState economic = 17;
   repeated SignedThought recent_thoughts = 18;
+  SafetyState safety = 19;
+}
+
+message SafetyState {
+  string threat_level = 1;
+  repeated string risk_factors = 2;
+  float system_integrity = 3;
+  string override_status = 4;
 }
 
 message SocialState {
   float reputation = 1;
   float global_trust = 2;
   map<string, float> self_concept = 3;
+  int32 active_connections = 4;
+  float signal_strength = 5;
+  float traffic_rate = 6;
 }
 
 message EconomicState {
   float balance = 1;
   float total_spent = 2;
   string wallet_address = 3;
+  float total_earned = 4;
+  float burn_rate = 5;
+  float wealth_velocity = 6;
 }
 
 message SignedThought {
