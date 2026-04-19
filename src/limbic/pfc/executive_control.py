@@ -16,10 +16,18 @@ class ExecutiveControl:
         self.cycle_results: Dict[str, List[dict]] = {} # planning_id -> list of valued plans
         self.effort_level = 0.0
         self.base_deliberation_window = 0.2
+        self.biases = {"optimism": 0.2, "loss_aversion": 1.5}
         
         self.bus.subscribe("UTILITY_ASSIGNED", self.on_utility_assigned)
         self.bus.subscribe("PLAN_VETTED", self.on_plan_vetted)
         self.bus.subscribe("EFFORT_REQUIRED", self.on_effort_required)
+        self.bus.subscribe("PSYCH_STATE", self.on_psych_state)
+
+    async def on_psych_state(self, state):
+        # Update biases based on ego coherence
+        coherence = state.get("ego_coherence", 1.0)
+        self.biases["optimism"] = 0.2 * coherence
+        self.biases["loss_aversion"] = 1.0 + (1.0 - coherence)
 
     async def on_effort_required(self, data):
         self.effort_level = data.get("level", 0.0)
@@ -27,6 +35,11 @@ class ExecutiveControl:
     async def on_utility_assigned(self, data):
         pid = data.get("id")
         if not pid: return
+        
+        # Apply cognitive bias modulation
+        utility = data.get("utility", 0.0)
+        utility *= (1.0 + self.biases.get("optimism", 0.0))
+        data["utility"] = utility
         
         if pid not in self.cycle_results:
             self.cycle_results[pid] = []

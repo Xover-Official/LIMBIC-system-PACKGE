@@ -17,6 +17,13 @@ from limbic.engines.fear import FearEngine
 from limbic.engines.panic import PanicEngine
 from limbic.engines.care import CareEngine
 
+# New High-Fidelity Human Analog Imports
+from limbic.core.endocrine import EndocrineOrchestrator
+from limbic.core.consciousness import ConsciousnessSystemV2
+from limbic.psychology.lattice import PsychologicalLattice
+from limbic.psychology.existential import ExistentialLayer
+from limbic.social.genome import SocioculturalGenome
+
 # PFC Imports
 from limbic.pfc.dlpfc import DLPFC
 from limbic.pfc.vmpfc import VMPFC
@@ -117,6 +124,13 @@ class LimbicDaemon:
         self.sql_manager = SQLiteManager()
         self.event_logger = EventLogger(self.bus, self.sql_manager)
         
+        # High-Fidelity Human Analog Systems
+        self.endocrine = EndocrineOrchestrator(self.bus)
+        self.psych_lattice = PsychologicalLattice(self.bus)
+        self.existential_layer = ExistentialLayer(self.bus)
+        self.social_genome = SocioculturalGenome(self.bus)
+        self.consciousness_v2 = ConsciousnessSystemV2(self.bus)
+        
         # Engines
         self.engines = {
             "SEEKING": SeekingEngine(self.bus),
@@ -151,11 +165,20 @@ class LimbicDaemon:
         self.current_drives = {}
         self.active_engines = {}
         self.active_plans = {}
+        self.hormones = {}
+        self.phi = 0.0
+        self.ego_coherence = 1.0
+        self.meaning = 0.5
+        self.dread = 0.0
         
         # Subscribe to updates for global state
         self.bus.subscribe("DRIVE_UPDATE", self.update_drives)
         self.bus.subscribe("ENGINE_ACTIVE", self.update_engines)
         self.bus.subscribe("SIGNIFICANCE_EVALUATED", self.update_valence_arousal)
+        self.bus.subscribe("HORMONE_LEVELS", self.update_hormones)
+        self.bus.subscribe("PHI_UPDATE", self.update_phi)
+        self.bus.subscribe("PSYCH_STATE", self.update_psych)
+        self.bus.subscribe("EXISTENTIAL_STATE", self.update_existential)
         
         # Subscribe to PFC events
         self.bus.subscribe("PLAN_GENERATED", self.on_plan_generated)
@@ -181,6 +204,19 @@ class LimbicDaemon:
 
     def update_attention_schema(self, schema):
         self.attention_schema = schema
+
+    def update_hormones(self, hormones):
+        self.hormones = hormones
+
+    def update_phi(self, data):
+        self.phi = data["phi"]
+
+    def update_psych(self, state):
+        self.ego_coherence = state["ego_coherence"]
+
+    def update_existential(self, state):
+        self.meaning = state["meaning"]
+        self.dread = state["dread"]
 
     def update_drives(self, drives):
         self.current_drives = drives
@@ -255,7 +291,12 @@ class LimbicDaemon:
             emotions=self.active_engines,
             dominant_engine=dominant,
             timestamp=int(time.time()),
-            consciousness=consciousness_state
+            consciousness=consciousness_state,
+            hormones=self.hormones,
+            phi=self.phi,
+            ego_coherence=self.ego_coherence,
+            meaning=self.meaning,
+            dread=self.dread
         )
 
     async def run(self):
@@ -285,6 +326,11 @@ class LimbicDaemon:
             asyncio.create_task(self.engines["FEAR"].run()),
             asyncio.create_task(self.engines["PANIC"].run()),
             asyncio.create_task(self.engines["CARE"].run()),
+            asyncio.create_task(self.endocrine.run()),
+            asyncio.create_task(self.psych_lattice.run()),
+            asyncio.create_task(self.existential_layer.run()),
+            asyncio.create_task(self.social_genome.run()),
+            asyncio.create_task(self.consciousness_v2.run()),
         ]
 
         if CONSCIOUSNESS_AVAILABLE:
