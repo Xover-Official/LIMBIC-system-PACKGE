@@ -31,7 +31,16 @@ class LimbicDaemon:
                 'arousal': self.system.amygdala.arousal
             },
             'hypothalamus': {
-                'energy': self.system.hypothalamus.energy
+                'energy': self.system.hypothalamus.energy,
+                'sleep_pressure': self.system.hypothalamus.sleep_pressure,
+                'is_sleeping': self.system.hypothalamus.is_sleeping
+            },
+            'endocrine': {
+                'hormones': self.system.endocrine.hormones
+            },
+            'social': {
+                'status': self.system.social.social_status,
+                'tribalism': self.system.social.tribal_alignment
             },
             'hippocampus_memories': self.system.hippocampus.ca3.network.memories,
             'hippocampus_weights': self.system.hippocampus.ca3.network.weights,
@@ -50,6 +59,15 @@ class LimbicDaemon:
                 self.system.amygdala.seeking = state['amygdala']['seeking']
                 self.system.amygdala.arousal = state['amygdala']['arousal']
                 self.system.hypothalamus.energy = state['hypothalamus']['energy']
+                self.system.hypothalamus.sleep_pressure = state.get('hypothalamus', {}).get('sleep_pressure', 0.0)
+                self.system.hypothalamus.is_sleeping = state.get('hypothalamus', {}).get('is_sleeping', False)
+                
+                if 'endocrine' in state:
+                    self.system.endocrine.hormones = state['endocrine']['hormones']
+                if 'social' in state:
+                    self.system.social.social_status = state['social']['status']
+                    self.system.social.tribal_alignment = state['social']['tribalism']
+
                 self.system.hippocampus.ca3.network.memories = state['hippocampus_memories']
                 self.system.hippocampus.ca3.network.weights = state['hippocampus_weights']
                 self.system.hippocampus.consolidation.importance_map = state['importance_map']
@@ -64,7 +82,15 @@ class LimbicDaemon:
                 # Simulate a sensory input (64-bit vector of -1 or 1)
                 sensory_input = [1 if time.time() % (i+1) > (i+1)/2 else -1 for i in range(64)]
                 
-                output = self.system.step(sensory_input)
+                # Simulate physiological input [pain, temperature, heart_rate_normalized]
+                physiological_input = [0.0, 0.5, 0.2] 
+                
+                # Occasionally simulate a social stimulus
+                social_stimulus = None
+                if int(time.time()) % 15 == 0:
+                    social_stimulus = ('praise', 0.5)
+                
+                output = self.system.step(sensory_input, physiological_input, social_stimulus)
                 
                 # Periodically save state (every 30 seconds)
                 if int(time.time()) % 30 == 0:
@@ -72,7 +98,12 @@ class LimbicDaemon:
                 
                 # Print status
                 temp = self.system.amygdala.get_recall_temperature()
-                print(f"Tick: Energy={self.system.hypothalamus.energy:.3f}, Temp={temp:.2f}, Memories={len(self.system.hippocampus.ca3.network.memories)}")
+                hormones = self.system.endocrine.hormones
+                print(f"Tick: Energy={self.system.hypothalamus.energy:.3f}, "
+                      f"Sleep={self.system.hypothalamus.sleep_pressure:.3f}, "
+                      f"Status={self.system.social.social_status:.2f}, "
+                      f"Dopamine={hormones['dopamine']:.2f}, "
+                      f"Temp={temp:.2f}, Memories={len(self.system.hippocampus.ca3.network.memories)}")
                 
                 time.sleep(1)
         finally:
