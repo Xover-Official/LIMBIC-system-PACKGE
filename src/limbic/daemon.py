@@ -23,6 +23,7 @@ from limbic.pfc.vmpfc import VMPFC
 from limbic.pfc.ofc import OFC
 from limbic.pfc.acc import ACC
 from limbic.pfc.executive_control import ExecutiveControl
+from limbic.pfc.working_memory import WorkingMemoryService
 
 # Sensorimotor Imports
 try:
@@ -90,7 +91,8 @@ class LimbicDaemon:
         self.insula = Insula(self.bus)
         
         # PFC
-        self.dlpfc = DLPFC(self.bus)
+        self.wm_service = WorkingMemoryService()
+        self.dlpfc = DLPFC(self.bus, wm_address=f"localhost:{self.port}")
         self.vmpfc = VMPFC(self.bus)
         self.ofc = OFC(self.bus)
         self.acc = ACC(self.bus)
@@ -134,6 +136,7 @@ class LimbicDaemon:
         
         # Subscribe to PFC events
         self.bus.subscribe("PLAN_GENERATED", self.on_plan_generated)
+        self.bus.subscribe("CANDIDATE_PLAN", self.on_plan_generated)
         self.bus.subscribe("PLAN_VETTED", self.on_plan_vetted)
         self.bus.subscribe("UTILITY_ASSIGNED", self.on_utility_assigned)
         self.bus.subscribe("ACTION_COMMAND", self.on_action_command)
@@ -153,7 +156,7 @@ class LimbicDaemon:
     def on_plan_generated(self, plan):
         action = plan["action"]
         self.active_plans[action] = {
-            "confidence": plan.get("confidence", 0.0),
+            "confidence": plan.get("confidence") or plan.get("probability") or 0.0,
             "status": "GENERATED"
         }
 
@@ -205,6 +208,7 @@ class LimbicDaemon:
         
         server = grpc.aio.server()
         limbic_pb2_grpc.add_LimbicServiceServicer_to_server(self.servicer, server)
+        limbic_pb2_grpc.add_WorkingMemoryServiceServicer_to_server(self.wm_service, server)
         listen_addr = f'[::]:{self.port}'
         server.add_insecure_port(listen_addr)
         
@@ -214,6 +218,7 @@ class LimbicDaemon:
         # Run all components
         tasks = [
             asyncio.create_task(self.bus.run()),
+            asyncio.create_task(self.wm_service.run()),
             asyncio.create_task(self.hypothalamus.run()),
             asyncio.create_task(self.hippocampus.run()),
             asyncio.create_task(self.dlpfc.run()),

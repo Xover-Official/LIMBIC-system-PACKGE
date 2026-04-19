@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+*.pyc
+data/
+*.index
+*.db
+src/limbic/generated/limbic_pb2*
+habits.json

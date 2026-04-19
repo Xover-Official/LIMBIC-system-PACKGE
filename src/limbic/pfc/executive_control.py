@@ -1,44 +1,90 @@
 import asyncio
 import logging
+from typing import Dict, List
 from limbic.bus import LimbicBus
 
 logger = logging.getLogger(__name__)
 
 class ExecutiveControl:
     """
-    Final decision layer that can override limbic impulses 
-    based on PFC evaluations.
+    Final decision layer that arbitrates between candidate plans
+    and can override limbic impulses.
     """
     def __init__(self, bus: LimbicBus):
         self.bus = bus
-        self.current_utility = 0.0
+        self.cycle_results: Dict[str, List[dict]] = {} # planning_id -> list of valued plans
+        
         self.bus.subscribe("UTILITY_ASSIGNED", self.on_utility_assigned)
-        self.bus.subscribe("CONFLICT_DETECTED", self.on_conflict)
-        self.bus.subscribe("HALT_SIGNAL", self.on_halt_signal)
-
-    async def on_halt_signal(self, halt_data):
-        if self.current_utility > 0.7:
-            logger.info(f"ExecutiveControl: High utility goal active ({self.current_utility:.2f}). Overriding HALT signal: {halt_data['type']}")
-            await self.bus.publish("BLOCK_HALT", {"type": halt_data["type"], "reason": "HIGH_PRIORITY_GOAL"})
-        else:
-            logger.info(f"ExecutiveControl: Deferring to HALT signal: {halt_data['type']}")
+        self.bus.subscribe("PLAN_VETTED", self.on_plan_vetted)
 
     async def on_utility_assigned(self, data):
-        plan = data["plan"]
-        utility = data["utility"]
-        self.current_utility = utility
+        pid = data.get("id")
+        if not pid: return
         
-        if utility > 0.5:
-            logger.info(f"ExecutiveControl: Executing plan {plan['action']} with utility {utility:.4f}")
-            await self.bus.publish("ACTION_COMMAND", {"action": plan["action"], "source": "PFC"})
-            # If there's a conflicting limbic signal, this effectively overrides it
-            await self.bus.publish("LIMBIC_OVERRIDE", {"blocked": ["FEAR", "PANIC"], "reason": "HIGH_GOAL_UTILITY"})
-        else:
-            logger.info(f"ExecutiveControl: Plan {plan['action']} has low utility {utility:.4f}, deferring to limbic system.")
+        if pid not in self.cycle_results:
+            self.cycle_results[pid] = []
+        
+        self.cycle_results[pid].append(data)
+        
+        # Arbitrate after a short window to collect multiple candidates
+        await asyncio.sleep(0.2) 
+        await self.arbitrate(pid)
 
-    async def on_conflict(self, conflict_data):
-        logger.info(f"ExecutiveControl: Mediating conflict: {conflict_data['reason']}")
+    async def on_plan_vetted(self, vetting):
+        # Immediate veto for severe moral/social violations
+        if not vetting.get("approved") and vetting.get("score", 0) < -0.3:
+            pid = vetting.get("id")
+            action = vetting.get("plan", {}).get("action")
+            logger.warning(f"ExecutiveControl: VETOING action {action} due to social constraint violation")
+            # Immediate override signal to inhibit the drive that might be pushing this
+            await self.bus.publish("LIMBIC_OVERRIDE", {
+                "suppress": ["SEEKING", "PANIC", "FEAR"], 
+                "reason": f"MORAL_VETO_{action}"
+            })
+
+    async def arbitrate(self, pid):
+        if pid not in self.cycle_results: return
+        
+        results = self.cycle_results[pid]
+        if not results: return
+        
+        # Sort candidates by utility
+        sorted_results = sorted(results, key=lambda x: x["utility"], reverse=True)
+        best = sorted_results[0]
+        
+        # Prevent double arbitration for the same cycle
+        del self.cycle_results[pid]
+        
+        action = best["plan"]["action"]
+        utility = best["utility"]
+        
+        if utility > 0.4:
+            logger.info(f"ExecutiveControl: PFC Decision: {action} (utility: {utility:.2f})")
+            await self.bus.publish("ACTION_COMMAND", {"action": action, "source": "PFC", "id": pid})
+            
+            # Send Top-Down Override signals to subcortical engines
+            if utility > 0.8:
+                # Total dominance
+                await self.bus.publish("LIMBIC_OVERRIDE", {
+                    "suppress": ["FEAR", "PANIC", "CARE", "SEEKING"],
+                    "reason": "EXECUTIVE_DOMINANCE"
+                })
+            elif action == "DEFEND":
+                await self.bus.publish("LIMBIC_OVERRIDE", {
+                    "suppress": ["SEEKING", "CARE"],
+                    "reason": "PRIORITIZE_DEFENSE"
+                })
+            elif action == "COOPERATE":
+                await self.bus.publish("LIMBIC_OVERRIDE", {
+                    "suppress": ["FEAR"],
+                    "reason": "OVERRIDE_FEAR_FOR_COOPERATION"
+                })
+        else:
+            logger.info(f"ExecutiveControl: Cycle {pid} - Low utility ({utility:.2f}), no PFC override.")
 
     async def run(self):
         while True:
             await asyncio.sleep(1)
+            # Periodic cleanup of leaked cycle results
+            if len(self.cycle_results) > 100:
+                self.cycle_results.clear()
