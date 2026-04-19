@@ -27,6 +27,7 @@ from limbic.linguistic.filters import WernickeFilter, BrocaFilter
 from limbic.psychology.lattice import PsychologicalLattice
 from limbic.psychology.existential import ExistentialLayer
 from limbic.social.genome import SocioculturalGenome
+from limbic.social.manager import SocialCognitionManager
 
 # PFC Imports
 from limbic.pfc.dlpfc import DLPFC
@@ -133,6 +134,7 @@ class LimbicDaemon:
         self.psych_lattice = PsychologicalLattice(self.bus)
         self.existential_layer = ExistentialLayer(self.bus)
         self.social_genome = SocioculturalGenome(self.bus)
+        self.social_cognition = SocialCognitionManager(self.bus)
         self.consciousness_v2 = ConsciousnessSystemV2(self.bus)
         
         # Project Omega Systems
@@ -320,7 +322,12 @@ class LimbicDaemon:
             "phi": self.phi,
             "ego_coherence": self.ego_coherence,
             "meaning": self.meaning,
-            "dread": self.dread
+            "dread": self.dread,
+            "social": limbic_pb2.SocialState(
+                reputation=self.social_cognition.reputation.reputation,
+                global_trust=self.social_cognition._calculate_global_trust(),
+                self_concept=self.social_cognition.reputation.self_concept
+            )
         }
         
         # Check if new fields are supported by the current limbic_pb2.LimbicState
@@ -361,6 +368,7 @@ class LimbicDaemon:
             asyncio.create_task(self.psych_lattice.run()),
             asyncio.create_task(self.existential_layer.run()),
             asyncio.create_task(self.social_genome.run()),
+            asyncio.create_task(self.social_cognition.run()),
             asyncio.create_task(self.consciousness_v2.run()),
             asyncio.create_task(self.vagus_nerve.run()),
             asyncio.create_task(self.pineal_gland.run()),
