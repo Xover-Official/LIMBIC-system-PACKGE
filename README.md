@@ -7,11 +7,18 @@ A biomimetic Limbic System for autonomous AI agents, implemented as a persistent
 - **Asyncio Message Bus**: Decoupled internal module communication.
 - **Biomimetic Modules**:
     - **Hypothalamus**: Drive management (Hunger, Safety, etc.).
-    - **Amygdala**: Fast-path significance evaluation.
-    - **Hippocampus**: Associative memory using FAISS.
+    - **Amygdala**: Fast-path significance evaluation and HALT signal generation.
+    - **Hippocampus v2.0**: Probabilistic associative memory using Bayesian retrieval and FAISS.
     - **Nucleus Accumbens**: Reward prediction error and dopamine modulation.
     - **Insula**: Interoception and feeling generation.
+- **Prefrontal Cortex (PFC)**:
+    - **DLPFC**: Planner and Working Memory.
+    - **VMPFC**: Social/Moral Evaluator.
+    - **OFC**: Bayesian Value/Risk Learner.
+    - **ACC**: Conflict Monitor and Resource Scaler.
+    - **Executive Control**: Top-down override and action mediation.
 - **Pankseppian Emotion Engines**: SEEKING, FEAR, PANIC, CARE.
+- **Dashboard**: Real-time visualization using Streamlit.
 
 ## Installation
 ```bash
