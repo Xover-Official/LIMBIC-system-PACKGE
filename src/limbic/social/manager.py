@@ -42,13 +42,19 @@ class SocialCognitionManager:
         # Start all sub-components
         tasks = [asyncio.create_task(component.run()) for component in self.components]
         
+        # Phase 3: Communication Loop implementation
+        asyncio.create_task(self.communication_loop())
+        
         # Monitor components
         while True:
             # Aggregate social state and publish to LimbicBus
             social_state = {
                 "reputation": self.reputation.reputation,
                 "global_trust": self._calculate_global_trust(),
-                "norm_complexity": len(self.norms.context_norms)
+                "norm_complexity": len(self.norms.context_norms),
+                "active_connections": 5, # Mocked for FactoryOS
+                "signal_strength": 0.85, # Mocked for FactoryOS
+                "traffic_rate": 12.4 # Mocked for FactoryOS (kb/s)
             }
             await self.bus.publish("SOCIAL_STATE_SUMMARY", social_state)
             
@@ -60,6 +66,27 @@ class SocialCognitionManager:
             })
             
             await asyncio.sleep(2)
+
+    async def communication_loop(self):
+        """Phase 3: Communication Loop implementation"""
+        while True:
+            # Simulate an incoming message
+            await asyncio.sleep(15)
+            ping_data = {
+                "sender": "FACTORY_CORE_ALPHA",
+                "message": "Status check requested.",
+                "signal_strength": 0.92
+            }
+            await self.bus.publish("COMMUNICATION_INCOMING", ping_data)
+            logger.info(f"Incoming communication from {ping_data['sender']}")
+            
+            # Auto-respond
+            await asyncio.sleep(2)
+            await self.bus.publish("COMMUNICATION_OUTGOING", {
+                "recipient": "FACTORY_CORE_ALPHA",
+                "message": "Status OK. Heartbeat active.",
+                "status": "DELIVERED"
+            })
 
     def _calculate_global_trust(self) -> float:
         if not self.memory.edges.get("self"):

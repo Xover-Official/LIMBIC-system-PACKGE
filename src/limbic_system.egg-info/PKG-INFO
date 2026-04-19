@@ -4,6 +4,7 @@ Version: 0.1.0
 Summary: A biomimetic Limbic System for autonomous AI agents
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
+License-File: LICENSE
 Requires-Dist: grpcio>=1.60.0
 Requires-Dist: grpcio-tools>=1.60.0
 Requires-Dist: faiss-cpu>=1.7.4
@@ -15,48 +16,137 @@ Requires-Dist: aiosqlite>=0.19.0
 Requires-Dist: streamlit>=1.28.0
 Requires-Dist: pandas>=2.0.0
 Requires-Dist: plotly>=5.17.0
+Requires-Dist: asyncpg>=0.29.0
+Requires-Dist: cryptography>=41.0.0
+Dynamic: license-file
 
-# Limbic System Package
+# LIMBIC-system-PACKGE 🧠❤️
 
-A biomimetic Limbic System for autonomous AI agents, implemented as a persistent Python daemon.
+[![Project Omega](https://img.shields.io/badge/Project-Omega-blueviolet)](https://github.com/Xover-Official/LIMBIC-system-PACKGE)
+[![Version](https://img.shields.io/badge/version-0.1.0--alpha-orange)](https://github.com/Xover-Official/LIMBIC-system-PACKGE)
 
-## Features
-- **gRPC Interface**: High-performance external communication.
-- **Asyncio Message Bus**: Decoupled internal module communication.
-- **Biomimetic Modules**:
-    - **Hypothalamus**: Drive management (Hunger, Safety, etc.).
-    - **Amygdala**: Fast-path significance evaluation and HALT signal generation.
-    - **Hippocampus v2.0**: Probabilistic associative memory using Bayesian retrieval and FAISS.
-    - **Nucleus Accumbens**: Reward prediction error and dopamine modulation.
-    - **Insula**: Interoception and feeling generation.
-- **Prefrontal Cortex (PFC)**:
-    - **DLPFC**: Planner and Working Memory.
-    - **VMPFC**: Social/Moral Evaluator.
-    - **OFC**: Bayesian Value/Risk Learner.
-    - **ACC**: Conflict Monitor and Resource Scaler.
-    - **Executive Control**: Top-down override and action mediation.
-- **Project Omega Integration**:
-    - **Physiological**: Vagus Nerve interoceptive coupling and Pineal Gland circadian regulation.
-    - **Linguistic**: Broca/Wernicke semantic and production filters.
-    - **Developmental**: Age Layer with age-based plasticity decay.
-    - **Conscious**: Phi-governed Global Workspace with Thalamic gating.
-- **Pankseppian Emotion Engines**: SEEKING, FEAR, PANIC, CARE.
-- **Dashboard**: Real-time visualization using Streamlit.
+A biomimetic Limbic System for autonomous AI agents, implemented as a persistent Python daemon. LIMBIC enables agents to have "feelings," drives, and associative memory, moving beyond simple stateless request-response models.
 
-## Installation
+---
+
+## 🌟 Vision
+To bridge the gap between Large Language Models and biological intelligence by providing a standardized, modular, and high-performance emotional-cognitive core. LIMBIC allows agents to experience arousal, valence, and Pankseppian emotions, leading to more natural and context-aware behavior.
+
+---
+
+## 🏗 Architecture
+The system follows a modular architecture connected by a high-speed internal message bus and exposed via gRPC.
+
+```mermaid
+graph TD
+    subgraph External
+        Agent[External Agent]
+        Dashboard[Streamlit Dashboard]
+    end
+
+    subgraph LIMBIC Core
+        gRPC[gRPC Interface]
+        Bus[Asyncio Message Bus]
+        
+        subgraph Modules
+            Amy[Amygdala: Significance]
+            Hyp[Hypothalamus: Drives]
+            Hip[Hippocampus: Memory]
+            PFC[Prefrontal Cortex: Executive]
+            NAc[Nucleus Accumbens: Reward]
+        end
+    end
+
+    Agent <--> gRPC
+    gRPC <--> Bus
+    Dashboard <--> gRPC
+    Bus <--> Amy
+    Bus <--> Hyp
+    Bus <--> Hip
+    Bus <--> PFC
+    Bus <--> NAc
+```
+
+---
+
+## ✨ Features
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **gRPC Interface** | High-performance external communication for any language. | ✅ |
+| **Asyncio Bus** | Decoupled internal module communication. | ✅ |
+| **Amygdala** | Fast-path significance evaluation and HALT signal generation. | ✅ |
+| **Hypothalamus** | Drive management (Hunger, Safety, Energy, Sleep). | ✅ |
+| **Hippocampus v2.0** | Probabilistic associative memory using Bayesian retrieval & FAISS. | ✅ |
+| **PFC** | Executive control, conflict monitoring (ACC), and planning. | 🔨 |
+| **Emotion Engines** | Pankseppian systems: SEEKING, FEAR, PANIC, CARE. | ✅ |
+| **Dashboard** | Real-time visualization of internal state using Streamlit. | ✅ |
+
+---
+
+## 🗺 Public Roadmap (Project Omega)
+
+### Phase 1: Foundation (Current)
+- [x] Core biomimetic modules.
+- [x] gRPC and internal Bus architecture.
+- [x] Basic CLI (`init`, `start`).
+- [x] Streamlit Dashboard integration.
+
+### Phase 2: Cognitive Expansion
+- [ ] Advanced PFC modules (VMPFC, OFC).
+- [ ] Vagus Nerve interoceptive coupling.
+- [ ] Pineal Gland circadian regulation.
+- [ ] Broca/Wernicke semantic production filters.
+
+### Phase 3: Social & Developmental
+- [ ] Age Layer with age-based plasticity decay.
+- [ ] Phi-governed Global Workspace with Thalamic gating.
+- [ ] Multi-agent social status and tribalism.
+
+---
+
+## 🚀 Installation
+
 ```bash
+git clone https://github.com/Xover-Official/LIMBIC-system-PACKGE.git
+cd LIMBIC-system-PACKGE
 pip install -e .
 ```
 
-## Usage
-1. Initialize the system:
+---
+
+## 🛠 Usage
+
+1. **Initialize** the system (creates data directories and databases):
    ```bash
    limbic init
    ```
-2. Start the daemon:
+
+2. **Start** the daemon:
    ```bash
    limbic start
    ```
 
-## Architecture
-The system uses an internal `LimbicBus` to pass messages between modules. For example, a `STIMULUS` message from gRPC is picked up by the Amygdala, Hippocampus, and Hypothalamus. The Amygdala might then trigger an `EMOTION_EVOKED` event, which the relevant Emotion Engine (e.g., FEAR) responds to by increasing its activation level.
+3. **Explore** the state via the dashboard:
+   ```bash
+   streamlit run src/limbic/dashboard/app.py
+   ```
+
+---
+
+## 📂 Examples
+Check the `/examples/` folder for:
+- `simple_agent.py`: Connecting an external agent via gRPC.
+- `emotional_test.py`: Sending stimuli and observing emotional reactions.
+- `consciousness_broadcast.py`: Listening to the Global Workspace.
+
+---
+
+## 📸 Dashboard Mockup
+![Streamlit Dashboard](docs/images/dashboard_mockup.png)
+*Real-time monitoring of hormones, drives, and emotional states.*
+
+---
+
+## 📜 License
+MIT License. See [LICENSE](LICENSE) for details.

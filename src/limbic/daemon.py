@@ -34,6 +34,7 @@ from limbic.psychology.lattice import PsychologicalLattice
 from limbic.psychology.existential import ExistentialLayer
 from limbic.social.genome import SocioculturalGenome
 from limbic.social.manager import SocialCognitionManager
+from limbic.core.safety import RedFlagSafetySystem
 
 # Production-Grade Components
 from limbic.pfc.moral_kernel import MoralKernel
@@ -205,6 +206,7 @@ class LimbicDaemon:
         self.wernicke = WernickeFilter(self.bus)
         self.broca = BrocaFilter(self.bus)
         self.age_layer = AgeLayer(self.bus)
+        self.safety_system = RedFlagSafetySystem(self.bus)
         
         # Engines
         self.engines = {
@@ -391,12 +393,24 @@ class LimbicDaemon:
             "social": limbic_pb2.SocialState(
                 reputation=self.social_cognition.reputation.reputation,
                 global_trust=self.social_cognition._calculate_global_trust(),
-                self_concept=self.social_cognition.reputation.self_concept
+                self_concept=self.social_cognition.reputation.self_concept,
+                active_connections=5,
+                signal_strength=0.85,
+                traffic_rate=12.4
             ),
             "economic": limbic_pb2.EconomicState(
                 balance=self.economic_engine.balance,
                 total_spent=self.economic_engine.total_spent,
-                wallet_address=self.wallet.address
+                wallet_address=self.wallet.address,
+                total_earned=self.economic_engine.total_earned,
+                burn_rate=self.economic_engine.total_spent / max(1.0, self.economic_engine.total_earned + self.economic_engine.total_spent),
+                wealth_velocity=self.economic_engine.total_earned - self.economic_engine.total_spent
+            ),
+            "safety": limbic_pb2.SafetyState(
+                threat_level=self.safety_system.threat_level,
+                risk_factors=self.safety_system.risk_factors,
+                system_integrity=self.safety_system.system_integrity,
+                override_status="AUTOMATED"
             ),
             "recent_thoughts": recent_thoughts
         }
@@ -452,6 +466,7 @@ class LimbicDaemon:
             asyncio.create_task(self.economic_engine.run()),
             asyncio.create_task(self.evolution_engine.run()),
             asyncio.create_task(self.semantic_registry.run()),
+            asyncio.create_task(self.safety_system.run()),
         ]
 
         if CONSCIOUSNESS_AVAILABLE:

@@ -61,7 +61,26 @@ async def websocket_endpoint(websocket: WebSocket):
                 "dread": state.dread,
                 "timestamp": state.timestamp,
                 "hormones": dict(state.hormones),
-                "recent_thoughts": recent_thoughts
+                "recent_thoughts": recent_thoughts,
+                "economic": {
+                    "balance": state.economic.balance,
+                    "total_spent": state.economic.total_spent,
+                    "total_earned": state.economic.total_earned,
+                    "burn_rate": state.economic.burn_rate,
+                    "wealth_velocity": state.economic.wealth_velocity
+                },
+                "social": {
+                    "reputation": state.social.reputation,
+                    "active_connections": state.social.active_connections,
+                    "signal_strength": state.social.signal_strength,
+                    "traffic_rate": state.social.traffic_rate
+                },
+                "safety": {
+                    "threat_level": state.safety.threat_level,
+                    "risk_factors": list(state.safety.risk_factors),
+                    "system_integrity": state.safety.system_integrity,
+                    "override_status": state.safety.override_status
+                }
             }
             await websocket.send_text(json.dumps(data))
     except Exception as e:
