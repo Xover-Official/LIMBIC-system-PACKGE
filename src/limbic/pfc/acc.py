@@ -14,6 +14,7 @@ class ACC:
         self.bus = bus
         self.current_emotions = {}
         self.candidate_plans = {} # planning_id -> list of plans
+        self.cycle_utilities = {} # planning_id -> list of utilities
         self.rpe_history = []
         
         self.bus.subscribe("ENGINE_ACTIVE", self.on_engine_active)
@@ -51,7 +52,24 @@ class ACC:
 
     async def on_utility_assigned(self, data):
         # Monitor choice difficulty (close utilities)
-        pass
+        pid = data.get("id")
+        if not pid: return
+
+        # We need to collect multiple utilities for the same pid to compare them
+        if pid not in self.cycle_utilities:
+            self.cycle_utilities[pid] = []
+
+        self.cycle_utilities[pid].append(data)
+
+        if len(self.cycle_utilities[pid]) > 1:
+            # Check for choice difficulty (similar utilities)
+            utils = sorted([u["utility"] for u in self.cycle_utilities[pid]], reverse=True)
+            if len(utils) >= 2:
+                diff = utils[0] - utils[1]
+                if diff < 0.1 and utils[0] > 0.3:
+                    logger.warning(f"ACC: Choice difficulty detected for cycle {pid} (diff: {diff:.3f}). Signaling high effort.")
+                    await self.bus.publish("EFFORT_REQUIRED", {"level": 0.8, "reason": "CHOICE_DIFFICULTY"})
+                    await self.bus.publish("CONFLICT_DETECTED", {"id": pid, "type": "CHOICE_DIFFICULTY", "level": 0.8})
 
     async def check_limb_plan_conflict(self):
         # Detect conflict between subcortical drive and cortical plan
@@ -99,5 +117,6 @@ class ACC:
             # Cleanup old candidate tracking
             await asyncio.sleep(60)
             self.candidate_plans.clear()
+            self.cycle_utilities.clear()
             self.current_emotions.clear()
             self.rpe_history.clear()

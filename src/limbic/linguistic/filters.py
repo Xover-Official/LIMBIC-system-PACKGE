@@ -50,15 +50,33 @@ class BrocaFilter:
         self.bus = bus
         self.current_valence = 0.0
         self.current_arousal = 0.0
+        self.emotions = {}
         self.bus.subscribe("SIGNIFICANCE_EVALUATED", self.update_state)
+        self.bus.subscribe("ENGINE_ACTIVE", self.update_emotions)
 
     async def update_state(self, eval):
-        self.current_valence = eval["valence"]
-        self.current_arousal = eval["arousal"]
+        self.current_valence = eval.get("valence", 0.0)
+        self.current_arousal = eval.get("arousal", 0.0)
+
+    async def update_emotions(self, data):
+        self.emotions[data["name"]] = data["level"]
 
     def filter_output(self, text: str) -> str:
         # If highly aroused, maybe add exclamation marks or capitalize
-        if self.current_arousal > 0.8:
+        fear_level = self.emotions.get("FEAR", 0.0)
+        seeking_level = self.emotions.get("SEEKING", 0.0)
+        panic_level = self.emotions.get("PANIC", 0.0)
+        care_level = self.emotions.get("CARE", 0.0)
+
+        if panic_level > 0.7:
+            text = f"HELP! {text.upper()}!! EMERGENCY!!!"
+        elif fear_level > 0.6:
+            text = f"[trembling] {text}... I'm worried."
+        elif seeking_level > 0.7:
+            text = f"Ooh! {text}! Let's find out more!"
+        elif care_level > 0.7:
+            text = f"{text}. I'm here for you."
+        elif self.current_arousal > 0.8:
             text = text.upper() + "!!!"
         elif self.current_valence < -0.5:
             text = text + "... (sigh)"

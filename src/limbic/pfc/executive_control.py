@@ -76,6 +76,15 @@ class ExecutiveControl:
         sorted_results = sorted(results, key=lambda x: x["utility"], reverse=True)
         best = sorted_results[0]
         
+        # Deliberative Stalemate:
+        # If there is high conflict and utilities are too close, defer or stay safe
+        if len(sorted_results) > 1:
+            diff = sorted_results[0]["utility"] - sorted_results[1]["utility"]
+            if diff < 0.1 and self.effort_level > 0.6:
+                logger.warning(f"ExecutiveControl: Deliberative stalemate for {pid}. Utilities too close ({diff:.4f}). Defaulting to safety.")
+                # Force a STAY or OBSERVE action instead of the potentially risky top choice
+                best = {"plan": {"action": "STAY", "id": pid}, "utility": 0.0}
+
         # Prevent double arbitration for the same cycle
         del self.cycle_results[pid]
         
@@ -86,7 +95,7 @@ class ExecutiveControl:
         # (Implementing impulse control and caution)
         threshold = 0.3 + (self.effort_level * 0.3)
         
-        if utility > threshold:
+        if utility > threshold or action == "STAY":
             logger.info(f"ExecutiveControl: PFC Decision: {action} (utility: {utility:.2f}, threshold: {threshold:.2f})")
             await self.bus.publish("ACTION_COMMAND", {"action": action, "source": "PFC", "id": pid})
             

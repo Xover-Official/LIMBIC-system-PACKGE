@@ -1,7 +1,6 @@
 import click
 import asyncio
 import os
-from limbic.daemon import LimbicDaemon
 
 @click.group()
 def main():
@@ -12,6 +11,7 @@ def main():
 @click.option('--port', default=50051, help='gRPC port')
 def start(port):
     """Start the Limbic System daemon"""
+    from limbic.daemon import LimbicDaemon
     daemon = LimbicDaemon(port=port)
     asyncio.run(daemon.run())
 
