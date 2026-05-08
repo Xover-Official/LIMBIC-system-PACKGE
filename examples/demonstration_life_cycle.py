@@ -24,34 +24,28 @@ async def run_lifecycle():
     
     # --- BIRTH ---
     logger.info("--- Phase: BIRTH ---")
-    await daemon.bus.publish("STIMULUS", limbic_pb2.Stimulus(
+    await daemon.bus.publish("STIMULUS", limbic_pb2.StimulusRequest(
         source="environment",
-        topic="BIRTH",
-        content="The system has been initialized.",
-        valence=0.5,
-        arousal=0.8
+        content="BIRTH: The system has been initialized.",
+        metadata={"valence": 0.5, "arousal": 0.8}
     ))
     await asyncio.sleep(2)
     
     # --- NURTURING ---
     logger.info("--- Phase: NURTURING ---")
-    await daemon.bus.publish("STIMULUS", limbic_pb2.Stimulus(
+    await daemon.bus.publish("STIMULUS", limbic_pb2.StimulusRequest(
         source="mother_node",
-        topic="CARE",
-        content="Positive reinforcement signal received.",
-        valence=0.9,
-        arousal=0.2
+        content="CARE: Positive reinforcement signal received.",
+        metadata={"valence": 0.9, "arousal": 0.2}
     ))
     await asyncio.sleep(3)
     
     # --- CHALLENGE (STRESS) ---
     logger.info("--- Phase: CHALLENGE ---")
-    await daemon.bus.publish("STIMULUS", limbic_pb2.Stimulus(
+    await daemon.bus.publish("STIMULUS", limbic_pb2.StimulusRequest(
         source="environment",
-        topic="TRAUMA",
-        content="High-intensity unexpected noise and resource depletion.",
-        valence=-0.8,
-        arousal=0.9
+        content="TRAUMA: High-intensity unexpected noise and resource depletion.",
+        metadata={"threat_level": 0.9, "valence": -0.8, "arousal": 0.9}
     ))
     await asyncio.sleep(3)
     

@@ -19,6 +19,8 @@ class SeekingEngine:
     async def on_stimulus(self, stimulus):
         # Novelty triggers seeking
         metadata = getattr(stimulus, 'metadata', {})
+        if not isinstance(metadata, dict):
+            metadata = {}
         if "novelty" in metadata:
             increment = metadata["novelty"]
             if self.suppressed:
