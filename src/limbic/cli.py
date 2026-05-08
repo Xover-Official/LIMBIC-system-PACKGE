@@ -9,10 +9,20 @@ def main():
 
 @main.command()
 @click.option('--port', default=50051, help='gRPC port')
-def start(port):
+@click.option('--webhook-port', default=None, type=int, help='HTTP Webhook port')
+@click.option('--speed', default=1.0, help='Simulation speed multiplier')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@click.option('--quiet', is_flag=True, help='Only log warnings and errors')
+def start(port, webhook_port, speed, debug, quiet):
     """Start the Limbic System daemon"""
+    import logging
+    level = logging.INFO
+    if debug: level = logging.DEBUG
+    if quiet: level = logging.WARNING
+    logging.basicConfig(level=level, force=True)
+
     from limbic.daemon import LimbicDaemon
-    daemon = LimbicDaemon(port=port)
+    daemon = LimbicDaemon(port=port, simulation_speed=speed, webhook_port=webhook_port)
     asyncio.run(daemon.run())
 
 @main.command()

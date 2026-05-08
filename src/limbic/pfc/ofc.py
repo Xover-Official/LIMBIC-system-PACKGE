@@ -13,6 +13,7 @@ class OFC:
     def __init__(self, bus: LimbicBus):
         self.bus = bus
         self.effort_level = 0.0
+        self.traits = {}
         # Simple action-value map (Bayesian prior)
         self.action_values = {
             "OBSERVE": {"mu": 0.1, "sigma": 0.1},
@@ -25,6 +26,10 @@ class OFC:
         self.bus.subscribe("PLAN_VETTED", self.calculate_utility)
         self.bus.subscribe("REWARD_RECEIVED", self.update_values)
         self.bus.subscribe("EFFORT_REQUIRED", self.on_effort_required)
+        self.bus.subscribe("PERSONALITY_STATE", self.on_personality)
+
+    async def on_personality(self, traits):
+        self.traits = traits
 
     async def on_effort_required(self, data):
         self.effort_level = data.get("level", 0.0)
@@ -48,6 +53,17 @@ class OFC:
         # Factor in VMPFC vetting score (moral/social value)
         vetting_score = vetting_data.get("score", 0.5)
         
+        # Apply Personality Traits
+        trait_bonus = 0.0
+        if action == "EXPLORE":
+            trait_bonus += self.traits.get("openness", 0.5) * 0.2
+        elif action == "COOPERATE":
+            trait_bonus += self.traits.get("agreeableness", 0.5) * 0.2
+        elif action == "STAY":
+            trait_bonus += (1.0 - self.traits.get("extraversion", 0.5)) * 0.1
+
+        base_utility += trait_bonus
+
         # Cost of Cognitive Effort (higher effort signals reduce utility of complex plans)
         # Simplified: all cortical plans have some effort cost
         effort_cost = self.effort_level * 0.1

@@ -9,6 +9,7 @@ from concurrent import futures
 from typing import Dict, Any, List
 
 from limbic.bus import LimbicBus
+from limbic.core.clock import SimulationClock
 from limbic.generated import limbic_pb2_grpc, limbic_pb2
 from limbic.core.hypothalamus import Hypothalamus
 from limbic.core.amygdala import Amygdala
@@ -30,7 +31,9 @@ from limbic.core.vagus_nerve import VagusNerve
 from limbic.core.pineal_gland import PinealGland
 from limbic.core.developmental import AgeLayer
 from limbic.linguistic.filters import WernickeFilter, BrocaFilter
+from limbic.integrations.webhook import WebhookIntegration
 from limbic.psychology.lattice import PsychologicalLattice
+from limbic.psychology.personality import PersonalitySystem
 from limbic.psychology.existential import ExistentialLayer
 from limbic.social.genome import SocioculturalGenome
 from limbic.social.manager import SocialCognitionManager
@@ -150,8 +153,10 @@ class LimbicServicer(limbic_pb2_grpc.LimbicServiceServicer):
         return limbic_pb2.PlanList(plans=plans)
 
 class LimbicDaemon:
-    def __init__(self, port=50051):
+    def __init__(self, port=50051, simulation_speed=1.0, webhook_port=None):
         self.port = port
+        self.webhook_port = webhook_port
+        self.clock = SimulationClock(simulation_speed=simulation_speed)
         self.bus = LimbicBus()
         self.servicer = LimbicServicer(self.bus, self)
         
@@ -195,6 +200,7 @@ class LimbicDaemon:
         # High-Fidelity Human Analog Systems
         self.endocrine = EndocrineOrchestrator(self.bus)
         self.psych_lattice = PsychologicalLattice(self.bus)
+        self.personality = PersonalitySystem(self.bus)
         self.existential_layer = ExistentialLayer(self.bus)
         self.social_genome = SocioculturalGenome(self.bus)
         self.social_cognition = SocialCognitionManager(self.bus, self.sql_manager, self.pg_manager)
@@ -208,6 +214,10 @@ class LimbicDaemon:
         self.age_layer = AgeLayer(self.bus)
         self.safety_system = RedFlagSafetySystem(self.bus)
         
+        self.webhook = None
+        if self.webhook_port:
+            self.webhook = WebhookIntegration(self.bus, port=self.webhook_port)
+
         # Engines
         self.engines = {
             "SEEKING": SeekingEngine(self.bus),
@@ -260,6 +270,7 @@ class LimbicDaemon:
         self.bus.subscribe("EXISTENTIAL_STATE", self.update_existential)
         self.bus.subscribe("DEVELOPMENTAL_STATE", self.update_developmental_state)
         self.bus.subscribe("VAGAL_TONE", self.update_vagal_tone)
+        self.bus.subscribe("STIMULUS", self.on_stimulus_received)
         
         # Subscribe to PFC events
         self.bus.subscribe("PLAN_GENERATED", self.on_plan_generated)
@@ -304,6 +315,11 @@ class LimbicDaemon:
 
     def update_vagal_tone(self, data):
         self.vagal_tone = data.get("tone", 0.5)
+
+    def on_stimulus_received(self, stimulus):
+        # Reset throttling when stimulus arrives
+        self.clock.set_throttle(1.0)
+        self.last_activity_time = time.time()
 
     def update_drives(self, drives):
         self.current_drives = drives
@@ -417,8 +433,23 @@ class LimbicDaemon:
         
         return limbic_pb2.LimbicState(**kwargs)
 
+    async def throttle_monitor(self):
+        while True:
+            # If no stimulus or high arousal for 30 simulation seconds, throttle down
+            idle_time = time.time() - self.last_activity_time
+            if idle_time > self.clock.adjust_time(30) and self.arousal < 0.4:
+                # Gradual throttle
+                new_throttle = min(5.0, 1.0 + (idle_time - self.clock.adjust_time(30)) / 10.0)
+                self.clock.set_throttle(new_throttle)
+            else:
+                self.clock.set_throttle(1.0)
+            await asyncio.sleep(2)
+
     async def run(self):
         # Initialize Persistence
+        self.last_activity_time = time.time()
+        asyncio.create_task(self.throttle_monitor())
+
         if self.pg_manager:
             await self.pg_manager.connect()
             # Distributed locking to ensure only one instance per agent
@@ -442,7 +473,7 @@ class LimbicDaemon:
         tasks = [
             asyncio.create_task(self.bus.run()),
             asyncio.create_task(self.wm_service.run()),
-            asyncio.create_task(self.hypothalamus.run()),
+            asyncio.create_task(self.hypothalamus.run(clock=self.clock)),
             asyncio.create_task(self.hippocampus.run()),
             asyncio.create_task(self.dlpfc.run()),
             asyncio.create_task(self.vmpfc.run()),
@@ -453,8 +484,9 @@ class LimbicDaemon:
             asyncio.create_task(self.engines["FEAR"].run()),
             asyncio.create_task(self.engines["PANIC"].run()),
             asyncio.create_task(self.engines["CARE"].run()),
-            asyncio.create_task(self.endocrine.run()),
+            asyncio.create_task(self.endocrine.run(clock=self.clock)),
             asyncio.create_task(self.psych_lattice.run()),
+            asyncio.create_task(self.personality.run()),
             asyncio.create_task(self.existential_layer.run()),
             asyncio.create_task(self.social_genome.run()),
             asyncio.create_task(self.social_cognition.run()),
@@ -468,6 +500,9 @@ class LimbicDaemon:
             asyncio.create_task(self.semantic_registry.run()),
             asyncio.create_task(self.safety_system.run()),
         ]
+
+        if self.webhook:
+            tasks.append(asyncio.create_task(self.webhook.run()))
 
         if CONSCIOUSNESS_AVAILABLE:
             tasks.append(asyncio.create_task(self.consciousness.run()))

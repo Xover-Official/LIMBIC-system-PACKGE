@@ -30,6 +30,8 @@ class EndocrineOrchestrator:
         # Example: high threat stimulus increases cortisol and adrenaline
         # request can be a StimulusRequest object or a dict
         metadata = getattr(request, 'metadata', {})
+        if not isinstance(metadata, dict):
+            metadata = {}
         threat_level = metadata.get('threat_level', 0.0)
         
         if threat_level > 0.7:
@@ -52,7 +54,7 @@ class EndocrineOrchestrator:
             self.hormones[hormone] = max(0.0, min(1.0, self.hormones[hormone] + amount))
             logger.debug(f"Released {hormone}: {self.hormones[hormone]}")
 
-    async def run(self):
+    async def run(self, clock=None):
         logger.info("EndocrineOrchestrator starting...")
         while True:
             # Decay towards baseline
@@ -61,4 +63,7 @@ class EndocrineOrchestrator:
                 self.hormones[hormone] += diff * 0.05 # Slow decay
             
             await self.bus.publish("HORMONE_LEVELS", self.hormones)
-            await asyncio.sleep(1)
+            if clock:
+                await clock.sleep_tick()
+            else:
+                await asyncio.sleep(1)
